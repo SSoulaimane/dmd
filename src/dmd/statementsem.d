@@ -1231,7 +1231,7 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
                     {
                         if (!p.type.isintegral())
                         {
-                            fs.error("foreach: key cannot be of non-integral type %s", p.type.toChars());
+                            fs.error("foreach: key cannot be of non-integral type `%s`", p.type.toChars());
                             goto case Terror;
                         }
                         var = new VarDeclaration(loc, p.type.mutableOf(), Identifier.generateId("__key"), null);
@@ -1263,7 +1263,7 @@ private extern (C++) final class StatementSemanticVisitor : Visitor
                         }
                         else if (!Type.tsize_t.implicitConvTo(var.type))
                         {
-                            fs.deprecation("foreach: loop index implicitly converted from `size_t` to %s",
+                            fs.deprecation("foreach: loop index implicitly converted from `size_t` to `%s`",
                                            fs.key.type.toChars());
                         }
                     }
