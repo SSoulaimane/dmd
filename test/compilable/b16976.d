@@ -1,7 +1,7 @@
 /* TEST_OUTPUT:
 ---
+compilable/b16976.d(14): Deprecation: foreach: loop index implicitly converted from `size_t` to `char`
 compilable/b16976.d(15): Deprecation: foreach: loop index implicitly converted from `size_t` to `char`
-compilable/b16976.d(16): Deprecation: foreach: loop index implicitly converted from `size_t` to `char`
 ---
 */
 void main()
