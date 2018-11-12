@@ -3172,10 +3172,11 @@ private void elstructwalk(elem *e,tym_t tym)
     {   elem_debug(e);
         e.Ety = (e.Ety & ~mTYbasic) | tym;
         switch (e.Eoper)
-        {   case OPcomma:
+        {
             case OPcond:
             case OPinfo:
                 break;
+            case OPcomma:
             case OPeq:
             case OPcolon:
             case OPcolon2:
