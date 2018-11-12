@@ -13,6 +13,7 @@
 module dmd.target;
 
 import dmd.argtypes;
+import dmd.argtypes_sysv_x64;
 import core.stdc.string : strlen;
 import dmd.cppmangle;
 import dmd.cppmanglewin;
@@ -523,6 +524,8 @@ struct Target
      */
     extern (C++) static TypeTuple toArgTypes(Type t)
     {
+        if (global.params.isSysV64bitABI)
+            return .toArgTypes_sysv_x64(t);
         if (global.params.is64bit && global.params.isWindows)
             return null;
         return .toArgTypes(t);
@@ -581,6 +584,14 @@ struct Target
                 if (tf.linkage == LINK.cpp && needsThis)
                     return true;
             }
+        }
+        else if (global.params.isSysV64bitABI)
+        {
+            TypeTuple tt = .toArgTypes_sysv_x64(tn);
+            if (!tt)
+                return false; // void
+            else
+                return !tt.arguments.dim;
         }
 
     Lagain:

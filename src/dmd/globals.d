@@ -242,6 +242,25 @@ struct Param
 
 alias structalign_t = uint;
 
+/// target follows System V 64bit ABI
+bool isSysV64bitABI(scope ref Param params)
+{
+    if (!params.is64bit)
+        return false;
+
+    bool y = params.isLinux
+          || params.isOSX
+          || params.isSolaris
+          || params.isFreeBSD
+          || params.isOpenBSD
+          || params.isDragonFlyBSD;
+
+    bool n = params.isWindows;
+
+    assert(y || n, "unknown TARGET");
+    return y;
+}
+
 // magic value means "match whatever the underlying C compiler does"
 // other values are all powers of 2
 enum STRUCTALIGN_DEFAULT = (cast(structalign_t)~0);
