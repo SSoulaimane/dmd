@@ -5681,7 +5681,9 @@ private elem *elToPair(elem *e)
                     e.Ety = ty0;
                     elem *e2 = el_copytree(e);
                     e2.EV.Voffset += _tysize[tybasic(ty0)];
-                    return el_bin(OPpair, ty, e, e2);
+                    elem *ep = el_bin(OPpair, ty, e, e2);
+                    ep.ET = e.ET;
+                    return ep;
 
                 default:
                     break;
@@ -5710,7 +5712,9 @@ private elem *elToPair(elem *e)
                         fixside(&e.EV.E1, &e2);
                     e2 = el_bin(OPadd,e2.Ety,e2,el_long(TYsize, _tysize[tybasic(ty0)]));
                     e2 = el_una(OPind, ty0, e2);
-                    return el_bin(OPpair, ty, e, e2);
+                    elem *ep = el_bin(OPpair, ty, e, e2);
+                    ep.ET = e.ET;
+                    return ep;
 
                 default:
                     break;
