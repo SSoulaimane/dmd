@@ -2559,21 +2559,77 @@ code *genmovreg(uint to,uint from)
 
 void genmovreg(ref CodeBuilder cdb,uint to,uint from)
 {
-    debug
-        if (to > ES || from > ES)
-            printf("genmovreg(to = %d, from = %d)\n",to,from);
+    genmovreg(cdb, to, from, TYMAX);
+}
 
-    assert(to <= ES && from <= ES);
+void genmovreg(ref CodeBuilder cdb, uint to, uint from, tym_t tym)
+{
+    // register kind. ex: GPR,XMM,SEG
+    static uint _K(uint reg)
+    {
+        switch (reg)
+        {
+        case ES:                   return ES;
+        case XMM15:
+        case XMM0: .. case XMM7:   return XMM0;
+        case AX:   .. case R15:    return AX;
+        default:                   return reg;
+        }
+    }
+
+    // kind combination (order kept)
+    static uint _X(uint to, uint from) { return (_K(to) << 8) + _K(from); }
+
     if (to != from)
     {
-        if (to == ES)
-            genregs(cdb,0x8E,0,from);
-        else if (from == ES)
-            genregs(cdb,0x8C,0,to);
-        else
-            genregs(cdb,0x89,from,to);
-        if (I64)
-            code_orrex(cdb.last(), REX_W);
+        if (tym == TYMAX) tym = TYnptr; // size == REGSIZE
+        switch (_X(to, from))
+        {
+            case _X(AX, AX):
+                uint op = 0x89;
+                if (I16 && tysize(tym) == 4) op = 0x6689;
+                else if (  tysize(tym) == 2) op = 0x6689;
+                genregs(cdb, op, from, to);    // MOV to,from
+                if (I64 && tysize(tym) == 8)
+                    code_orrex(cdb.last(), REX_W);
+                break;
+
+            case _X(XMM0, XMM0):             // MOVD/Q to,from
+                genregs(cdb, xmmload(tym), to-XMM0, from-XMM0);
+                checkSetVex(cdb.last(), tym);
+                break;
+
+            case _X(AX, XMM0):               // MOVD/Q to,from
+                uint op = tysize(tym) == 8 ? STOD : xmmstore(tym);
+                genregs(cdb, op, from-XMM0, to);
+                checkSetVex(cdb.last(), tym);
+                if (I64 && tysize(tym) == 8)
+                    code_orrex(cdb.last(), REX_W);
+                break;
+
+            case _X(XMM0, AX):               // MOVD/Q to,from
+                uint op = tysize(tym) == 8 ? LODD : xmmload(tym);
+                genregs(cdb, op, to-XMM0, from);
+                checkSetVex(cdb.last(), tym);
+                if (I64 && tysize(tym) == 8)
+                    code_orrex(cdb.last(),  REX_W);
+                break;
+
+            case _X(ES, AX):
+                assert(tysize(tym) <= REGSIZE);
+                genregs(cdb, 0x8E, 0, from);
+                break;
+
+            case _X(AX, ES):
+                assert(tysize(tym) <= REGSIZE);
+                genregs(cdb, 0x8C, 0, to);
+                break;
+
+            default:
+                debug printf("genmovreg(to = %s, from = %s)\n"
+                    , regm_str(mask(to)), regm_str(mask(from)));
+                assert(0);
+        }
     }
 }
 
