@@ -3747,7 +3747,7 @@ static if (0)
         cdb.genadjfpu(1);
         if (*pretregs)                  // if we want the result
         {
-            //assert(stackused == 0);
+            assert(stackused == 0);
             push87(cdb);                // one item on 8087 stack
             fixresult87(cdb,e,retregs,pretregs);
             return;
