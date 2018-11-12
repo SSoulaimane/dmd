@@ -3318,6 +3318,14 @@ elem * elstruct(elem *e, goal_t goal)
                 goto L1;
             goto Ldefault;
 
+        case 32:
+        case 64:
+            if (ty == TYstruct && I64 && config.exe != EX_WIN64)
+            {
+                goto L1;
+            }
+            goto Ldefault;
+
         L1:
             if (ty == TYstruct)
             {   // This needs to match what TypeFunction::retStyle() does
