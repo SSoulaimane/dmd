@@ -3260,10 +3260,11 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
             reg_t mreg,lreg;
             if (preg2 != NOREG)
             {
-                assert(ep.Eoper != OPstrthis);
                 if (mask(preg2) & XMMREGS)
-                {
                     ++xmmcnt;
+                assert(ep.Eoper != OPstrthis);
+                if (mask(preg) & XMMREGS)
+                {
                     lreg = XMM0;
                     mreg = XMM1;
                 }
