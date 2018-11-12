@@ -538,6 +538,7 @@ void genpop(ref CodeBuilder cdb, uint reg);
 void gensavereg(ref CodeBuilder cdb, ref uint reg, targ_uns slot);
 code *genmovreg(uint to, uint from);
 void genmovreg(ref CodeBuilder cdb, uint to, uint from);
+void genmovreg(ref CodeBuilder cdb, uint to, uint from, tym_t tym);
 void genmulimm(ref CodeBuilder cdb,uint r1,uint r2,targ_int imm);
 void genshift(ref CodeBuilder cdb);
 void movregconst(ref CodeBuilder cdb,uint reg,targ_size_t value,regm_t flags);
