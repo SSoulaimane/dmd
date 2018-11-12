@@ -948,7 +948,7 @@ static if (0)
     e.Eoper = cast(ubyte)op;
     e.EV.E1 = e1;
     e.EV.E2 = e2;
-    if (op == OPcomma && tyaggregate(ty))
+    if (op == OPcomma)
         e.ET = e2.ET;
     return e;
 }
