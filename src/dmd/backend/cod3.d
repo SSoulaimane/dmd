@@ -1093,7 +1093,25 @@ static if (NTEXCEPTIONS)
 }
 
         case BCretexp:
-            retregs = regmask(e.Ety, funcsym_p.ty());
+            reg_t reg1, reg2, lreg, mreg;
+            allocretregs(e.Ety, e.ET, funcsym_p.ty(), &reg1, &reg2);
+            assert(reg1 != NOREG);
+
+            if (mask(reg1) & (mST0 | mST01))
+                lreg = reg1;
+            else if (mask(reg1) & XMMREGS)
+            {
+                lreg = XMM0;
+                mreg = XMM1;
+            }
+            else
+            {
+                lreg = mask(reg1) & mLSW ? reg1 : AX;
+                mreg = mask(reg2) & mMSW ? reg2 : DX;
+            }
+            if (reg2 == NOREG)
+                mreg = NOREG;
+            retregs = mask(lreg) | mask(mreg);
 
             // For the final load into the return regs, don't set regcon.used,
             // so that the optimizer can potentially use retregs for register
@@ -1124,6 +1142,26 @@ static if (NTEXCEPTIONS)
             {
                 gencodelem(cdb,e,&retregs,true);
             }
+
+            if ((mask(reg1) | mask(reg2)) & (mST0 | mST01))
+            {
+                assert(reg1 == lreg && reg2 == NOREG);
+                // balance `stackused` (funccall() calls push87())
+                pop87();
+                if (reg1 == ST01)
+                    pop87();
+            }
+            // fix return registers
+            else if (reg2 == NOREG)
+                genmovreg(cdb, reg1, lreg);
+            else for (int v = 0; v < 2; v++)
+            {
+                if (v ^ (reg1 != mreg))
+                    genmovreg(cdb, reg1, lreg);
+                else
+                    genmovreg(cdb, reg2, mreg);
+            }
+            retregs = mask(reg1) | mask(reg2);
             goto L4;
 
         case BCret:
