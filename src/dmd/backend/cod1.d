@@ -3323,33 +3323,9 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                 for (int v = 0; v < 2; v++)
                 {
                     if (v ^ (preg != mreg))
-                    {
-                        if (preg != lreg)
-                        {
-                            if (mask(preg) & XMMREGS)
-                            {
-                                uint op = xmmload(ty1);            // MOVSS/D preg,lreg
-                                cdb.gen2(op, modregxrmx(3, preg-XMM0, lreg-XMM0));
-                                checkSetVex(cdb.last(),ty1);
-                            }
-                            else
-                                genmovreg(cdb, preg, lreg);
-                        }
-                    }
+                        genmovreg(cdb, preg, lreg, ty1);
                     else
-                    {
-                        if (preg2 != mreg)
-                        {
-                            if (mask(preg2) & XMMREGS)
-                            {
-                                uint op = xmmload(ty2);            // MOVSS/D preg2,mreg
-                                cdb.gen2(op, modregxrmx(3, preg2-XMM0, mreg-XMM0));
-                                checkSetVex(cdb.last(),ty2);
-                            }
-                            else
-                                genmovreg(cdb, preg2, mreg);
-                        }
-                    }
+                        genmovreg(cdb, preg2, mreg, ty2);
                 }
 
                 retregs = mask(preg) | mask(preg2);
