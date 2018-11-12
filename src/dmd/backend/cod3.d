@@ -1233,6 +1233,133 @@ version (MARS)
     }
 }
 
+/***************************
+ * Allocate registers for function return values.
+ *
+ * Params:
+ *    ty    = return type
+ *    t     = return type extended info
+ *    tyf   = function type
+ *    reg1  = output for the first part register
+ *    reg2  = output for the second part register
+ *
+ * Returns:
+ *    a bit mask of return registers.
+ *    0 if function returns void.
+ */
+regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
+{
+    tym_t ty1 = ty;
+    tym_t ty2 = TYMAX;
+
+    *reg1 = *reg2 = NOREG;
+
+    if (tybasic(ty) == TYvoid)
+        return 0;
+
+    assert(I64);
+
+    switch (tybasic(ty1))
+    {
+        case TYcent:
+        case TYucent:
+            if (config.exe == EX_WIN64)
+                ty1 = TYnptr;
+            else
+                ty1 = ty2 = TYllong;
+            break;
+
+        case TYcdouble:
+            if (config.exe == EX_WIN64)
+                ty1 = TYnptr;   // pointer to the stack
+            else
+                ty1 = ty2 = TYdouble;
+            break;
+
+        case TYcfloat:
+            ty1 = TYdouble;
+            break;
+
+        case TYstruct:
+        case TYarray:
+            ty1 = TYnptr;       // pointer to the stack
+            break;
+
+        case TYldouble:
+        case TYildouble:
+        case TYcldouble:
+            if (config.exe == EX_WIN64)
+                ty1 = TYnptr;   // pointer to the stack
+            break;
+
+        default:
+            break;
+    }
+
+    if (t && t.Tty == TYstruct)
+    {
+        type *targ1 = t.Ttag.Sstruct.Sarg1type;
+        type *targ2 = t.Ttag.Sstruct.Sarg2type;
+        if (targ1) ty1 = targ1.Tty;
+        if (targ2) ty2 = targ2.Tty;
+    }
+
+    static struct RetRegsAllocator
+    {
+        static reg_t[2] gp_regs = [AX, DX];
+        static reg_t[2] xmm_regs = [XMM0, XMM1];
+
+        uint cntgpr = 0,
+             cntxmm = 0;
+
+        reg_t gpr() { return gp_regs[cntgpr++]; }
+        reg_t xmm() { return xmm_regs[cntxmm++]; }
+    }
+
+    tym_t tym = ty1;
+    reg_t *reg = reg1;
+    RetRegsAllocator rralloc;
+    for (int v = 0; v < 2; ++v)
+    {
+        if (tym == TYMAX) continue;
+        switch (tysize(tym))
+        {
+        case 1:
+        case 2:
+        case 4:
+            if (tyfloating(tym))
+                *reg = rralloc.xmm();
+            else
+                *reg = rralloc.gpr();
+            break;
+
+        case 8:
+            assert(I64);
+            goto case 4;
+
+        default:
+            if (tybasic(tym) == TYldouble || tybasic(tym) == TYildouble)
+            {   *reg = ST0;
+                break;
+            }
+            else if (tybasic(tym) == TYcldouble)
+            {   *reg = ST01;
+                break;
+            }
+            else if (tysimd(tym))
+            {   *reg = rralloc.xmm();
+                break;
+            }
+
+            debug WRTYxx(tym);
+            assert(0);
+        }
+        tym = ty2;
+        reg = reg2;
+    }
+    return (mask(*reg1) | mask(*reg2)) & ~mask(NOREG);
+}
+
 /***********************************************
  * Struct necessary for sorting switch cases.
  */
