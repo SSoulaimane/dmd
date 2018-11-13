@@ -236,6 +236,10 @@ private elem *callfunc(const ref Loc loc,
                  */
                 ea.Ety = TYllong;
             }
+            if (tf.parameterList.varargs == VarArg.variadic && i >= tf.parameterList.length)
+            {
+                ea.Eflags |= EFLAGS_variadic;
+            }
             elems[i] = ea;
         }
         if (!left_to_right)
