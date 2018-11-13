@@ -188,6 +188,7 @@ private elem *callfunc(const ref Loc loc,
         /* Convert arguments[] to elems[] in left-to-right order
          */
         const n = arguments.dim;
+        size_t nparams = Parameter.dim(tf.parameters);
         elem*[5] elems_array = void;
         import core.stdc.stdlib : malloc, free;
         auto elems = (n <= 5) ? elems_array.ptr : cast(elem**)malloc(arguments.dim * (elem*).sizeof);
@@ -203,7 +204,6 @@ private elem *callfunc(const ref Loc loc,
 
             //printf("\targ[%d]: %s\n", i, arg.toChars());
 
-            size_t nparams = Parameter.dim(tf.parameters);
             if (i - j < nparams && i >= j)
             {
                 Parameter p = Parameter.getNth(tf.parameters, i - j);
@@ -228,6 +228,10 @@ private elem *callfunc(const ref Loc loc,
                 /* Treat a cfloat like it was a struct { float re,im; }
                  */
                 ea.Ety = TYllong;
+            }
+            if (tf.varargs == 1 && i >= nparams)
+            {
+                ea.Eflags |= EFLAGS_variadic;
             }
         L1:
             elems[i] = ea;
