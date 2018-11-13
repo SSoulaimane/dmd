@@ -1295,40 +1295,42 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
     if (tybasic(ty) == TYvoid)
         return 0;
 
-    assert(I64);
-
-    switch (tybasic(ty1))
+    switch (tyrelax(ty1))
     {
         case TYcent:
-        case TYucent:
-            if (config.exe == EX_WIN64)
-                ty1 = TYnptr;
-            else
-                ty1 = ty2 = TYllong;
+            if (!I64 || config.exe == EX_WIN64)
+                goto case TYstruct;
+            ty1 = ty2 = TYllong;
             break;
 
         case TYcdouble:
-            if (config.exe == EX_WIN64)
-                ty1 = TYnptr;   // pointer to the stack
-            else
-                ty1 = ty2 = TYdouble;
+            if (!I64 || config.exe == EX_WIN64)
+                goto case TYstruct;
+            ty1 = ty2 = TYdouble;
             break;
 
         case TYcfloat:
+            if (!I64)
+                goto case TYllong;
+            if (config.exe == EX_WIN64)
+                goto case TYstruct;
             ty1 = TYdouble;
+            break;
+
+        case TYcldouble:
+            if (!I64 || config.exe == EX_WIN64)
+                goto case TYstruct;
+            break;
+
+        case TYllong:
+            if (!I64)
+                ty1 = ty2 = TYlong;
             break;
 
         case TYstruct:
         case TYarray:
-            ty1 = TYnptr;       // pointer to the stack
-            break;
-
-        case TYldouble:
-        case TYildouble:
-        case TYcldouble:
-            if (config.exe == EX_WIN64)
-                ty1 = TYnptr;   // pointer to the stack
-            break;
+            ty1 = TYnptr;       // fits in one register
+            break;              // or pointer to the stack
 
         default:
             break;
@@ -1336,10 +1338,21 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
 
     if (t && t.Tty == TYstruct)
     {
-        type *targ1 = t.Ttag.Sstruct.Sarg1type;
-        type *targ2 = t.Ttag.Sstruct.Sarg2type;
-        if (targ1) ty1 = targ1.Tty;
-        if (targ2) ty2 = targ2.Tty;
+        if (I64 && config.exe != EX_WIN64)
+        {
+            type *targ1 = t.Ttag.Sstruct.Sarg1type;
+            type *targ2 = t.Ttag.Sstruct.Sarg2type;
+            if (targ1) ty1 = targ1.Tty;
+            if (targ2) ty2 = targ2.Tty;
+        }
+        else if (config.exe == EX_WIN32 && !(t.Ttag.Sstruct.Sflags & STRnotpod))
+        {
+            uint sz = cast(uint) type_size(t);
+            if (sz <= 8)
+                ty1 = ty2 = TYlong;
+            else if (sz <= 4)
+                ty1 = TYlong;
+        }
     }
 
     static struct RetRegsAllocator
@@ -1366,26 +1379,34 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
         case 2:
         case 4:
             if (tyfloating(tym))
-                *reg = rralloc.xmm();
+            {
+                if (I64)
+                    *reg = rralloc.xmm();
+                else
+                    *reg = ST0;
+            }
             else
                 *reg = rralloc.gpr();
             break;
 
         case 8:
-            assert(I64);
+            assert(I64 || tyfloating(tym));
             goto case 4;
 
         default:
             if (tybasic(tym) == TYldouble || tybasic(tym) == TYildouble)
-            {   *reg = ST0;
+            {
+                *reg = ST0;
                 break;
             }
             else if (tybasic(tym) == TYcldouble)
-            {   *reg = ST01;
+            {
+                *reg = ST01;
                 break;
             }
             else if (tysimd(tym))
-            {   *reg = rralloc.xmm();
+            {
+                *reg = rralloc.xmm();
                 break;
             }
 
