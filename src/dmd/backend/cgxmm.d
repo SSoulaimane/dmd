@@ -663,6 +663,14 @@ uint xmmload(tym_t tym, bool aligned)
         aligned = false;
     switch (tybasic(tym))
     {
+        case TYptr:
+        case TYnptr:
+        case TYref:
+        case TYnref:
+            if (tysize(tym) == tysize(TYllong))
+                goto case TYllong;
+            goto case TYlong;
+
         case TYuint:
         case TYint:
         case TYlong:
@@ -712,6 +720,14 @@ uint xmmstore(tym_t tym, bool aligned)
 {   uint op;
     switch (tybasic(tym))
     {
+        case TYptr:
+        case TYnptr:
+        case TYref:
+        case TYnref:
+            if (tysize(tym) == tysize(TYllong))
+                goto case TYllong;
+            goto case TYlong;
+
         case TYuint:
         case TYint:
         case TYlong:
