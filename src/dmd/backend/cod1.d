@@ -3332,6 +3332,10 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                     if (targ2)
                         ty2 = targ2.Tty;
                 }
+                else if (tyrelax(ty1) == TYcent)
+                    ty1 = ty2 = TYllong;
+                else if (tybasic(ty1) == TYcdouble)
+                    ty1 = ty2 = TYdouble;
 
                 for (int v = 0; v < 2; v++)
                 {
