@@ -3258,11 +3258,7 @@ elem * elstruct(elem *e, goal_t goal)
         case 6:
         case 7:  tym = TYllong;
         L2:
-            if (e.Eoper == OPstrpar && config.exe == EX_WIN64)
-            {
-                 goto L1;
-            }
-            if (e.Eoper == OPstrpar && I64 && ty == TYstruct)
+            if (I64 && config.exe != EX_WIN64)
             {
                 goto L1;
             }
@@ -3281,8 +3277,8 @@ elem * elstruct(elem *e, goal_t goal)
         case 11:
         case 13:
         case 14:
-        case 15:
-            if (e.Eoper == OPstrpar && I64 && ty == TYstruct && config.exe != EX_WIN64)
+        case 15:  tym = TYucent;
+            if (I64 && config.exe != EX_WIN64)
             {
                 goto L1;
             }
@@ -3305,14 +3301,10 @@ elem * elstruct(elem *e, goal_t goal)
                     goto L1;
                 }
             }
-            if (I64 && (ty == TYstruct || (ty == TYarray && config.exe == EX_WIN64)))
+            if (I64 && config.exe != EX_WIN64)
             {   tym = TYucent;
                 goto L1;
             }
-            if (config.exe == EX_WIN64)
-                goto Ldefault;
-            if (targ1 && !targ2)
-                goto L1;
             goto Ldefault;
 
         case 32:
@@ -3334,14 +3326,7 @@ elem * elstruct(elem *e, goal_t goal)
                 else if (targ1 && !targ2)
                     tym = targ1.Tty;
                 else if (I64 && !targ1 && !targ2)
-                {   if (t.Ttag.Sstruct.Sflags & STRnotpod)
-                    {
-                        // In-memory only
-                        goto Ldefault;
-                    }
-//                    if (type_size(t) == 16)
-                        goto Ldefault;
-                }
+                    goto Ldefault;
                 else if (I64 && targ1 && targ2)
                 {   if (tyfloating(tybasic(targ1.Tty)))
                         tym = TYcdouble;
