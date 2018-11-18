@@ -2902,7 +2902,7 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
 
     // If struct or just wraps another type
     if (t && tybasic(t.Tty) == TYstruct
-        && (ty == TYstruct || tyrelax(ty) == TYcent
+        && (tybasic(ty) == TYstruct || tyrelax(ty) == TYcent
             || tybasic(ty) == TYcdouble))
     {
         if (config.exe == EX_WIN64)
