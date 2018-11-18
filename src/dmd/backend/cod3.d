@@ -1094,10 +1094,15 @@ static if (NTEXCEPTIONS)
 
         case BCretexp:
             reg_t reg1, reg2, lreg, mreg;
-            allocretregs(e.Ety, e.ET, funcsym_p.ty(), &reg1, &reg2);
-            assert(reg1 != NOREG);
+            retregs = allocretregs(e.Ety, e.ET, funcsym_p.ty(), &reg1, &reg2);
+            assert(reg1 != NOREG || !retregs);
 
-            if (mask(reg1) & (mST0 | mST01))
+            lreg = mreg = NOREG;
+            if (reg1 == NOREG)
+            {}
+            else if (mask(reg1) & (mST0 | mST01))
+                lreg = reg1;
+            else if (reg2 == NOREG)
                 lreg = reg1;
             else if (mask(reg1) & XMMREGS)
             {
@@ -1109,9 +1114,6 @@ static if (NTEXCEPTIONS)
                 lreg = mask(reg1) & mLSW ? reg1 : AX;
                 mreg = mask(reg2) & mMSW ? reg2 : DX;
             }
-            if (reg2 == NOREG)
-                mreg = NOREG;
-            retregs = mask(lreg) | mask(mreg);
 
             // For the final load into the return regs, don't set regcon.used,
             // so that the optimizer can potentially use retregs for register
@@ -1143,7 +1145,10 @@ static if (NTEXCEPTIONS)
                 gencodelem(cdb,e,&retregs,true);
             }
 
-            if ((mask(reg1) | mask(reg2)) & (mST0 | mST01))
+            if (reg1 == NOREG)
+            {
+            }
+            else if ((mask(reg1) | mask(reg2)) & (mST0 | mST01))
             {
                 assert(reg1 == lreg && reg2 == NOREG);
                 if (reg1 == ST01 && I64)
@@ -1151,7 +1156,7 @@ static if (NTEXCEPTIONS)
             }
             // fix return registers
             else if (reg2 == NOREG)
-                genmovreg(cdb, reg1, lreg);
+                assert(lreg == reg1);
             else for (int v = 0; v < 2; v++)
             {
                 if (v ^ (reg1 != mreg))
@@ -1281,7 +1286,7 @@ version (MARS)
  *
  * Returns:
  *    a bit mask of return registers.
- *    0 if function returns void.
+ *    0 if function returns on the stack or returns void.
  */
 regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
 {
@@ -1293,31 +1298,44 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
     if (tybasic(ty) == TYvoid)
         return 0;
 
+    if (ty & mTYreplaced)
+    {
+        assert(t);
+        ty = t.Tty;
+    }
+
     switch (tyrelax(ty1))
     {
         case TYcent:
             if (!I64 || config.exe == EX_WIN64)
-                goto case TYstruct;
+                return 0;
             ty1 = ty2 = TYllong;
             break;
 
         case TYcdouble:
+            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+                break;
             if (!I64 || config.exe == EX_WIN64)
-                goto case TYstruct;
+                return 0;
             ty1 = ty2 = TYdouble;
             break;
 
         case TYcfloat:
+            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+                break;
             if (!I64)
                 goto case TYllong;
             if (config.exe == EX_WIN64)
-                goto case TYstruct;
-            ty1 = TYdouble;
+                ty1 = TYllong;
+            else
+                ty1 = TYdouble;
             break;
 
         case TYcldouble:
+            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+                break;
             if (!I64 || config.exe == EX_WIN64)
-                goto case TYstruct;
+                return 0;
             break;
 
         case TYllong:
@@ -1325,33 +1343,56 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
                 ty1 = ty2 = TYlong;
             break;
 
-        case TYstruct:
         case TYarray:
-            ty1 = TYnptr;       // fits in one register
-            break;              // or pointer to the stack
+            return 0;
+
+        case TYstruct:
+            assert(t);
+            if (I64 && config.exe != EX_WIN64)
+            {
+                if (t.Tty != TYstruct)
+                    return 0;
+                type *targ1 = t.Ttag.Sstruct.Sarg1type;
+                type *targ2 = t.Ttag.Sstruct.Sarg2type;
+                if (targ1)
+                    ty1 = targ1.Tty;
+                else
+                    return 0;
+                if (targ2)
+                    ty2 = targ2.Tty;
+                break;
+            }
+            else if (!(t.Ttag.Sstruct.Sflags & STRnotpod))
+            {
+                // windows only, return POD of 1, 2, 4, or 8 bytes on EAX(:EDX)
+                if (0 == (config.exe & (EX_WIN64 | EX_WIN32)))
+                    return 0;
+
+                uint sz = cast(uint) type_size(t);
+
+                if (sz > 8 || sz == 0)
+                    return 0;
+
+                if (sz == 8)
+                {
+                    if (config.exe == EX_WIN64)
+                        ty1 = TYllong;
+                    else
+                        ty1 = ty2 = TYlong;
+                }
+                else if (sz == 4 || sz == 2 || sz == 1)
+                    ty1 = TYlong;
+                else
+                    return 0;
+
+                break;
+            }
+            return 0;
 
         default:
             break;
     }
 
-    if (t && t.Tty == TYstruct)
-    {
-        if (I64 && config.exe != EX_WIN64)
-        {
-            type *targ1 = t.Ttag.Sstruct.Sarg1type;
-            type *targ2 = t.Ttag.Sstruct.Sarg2type;
-            if (targ1) ty1 = targ1.Tty;
-            if (targ2) ty2 = targ2.Tty;
-        }
-        else if (config.exe == EX_WIN32 && !(t.Ttag.Sstruct.Sflags & STRnotpod))
-        {
-            uint sz = cast(uint) type_size(t);
-            if (sz <= 8)
-                ty1 = ty2 = TYlong;
-            else if (sz <= 4)
-                ty1 = TYlong;
-        }
-    }
 
     static struct RetRegsAllocator
     {
@@ -1388,6 +1429,12 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case 8:
+            if (tycomplex(tym))
+            {
+                assert(tybasic(tyf) == TYjfunc && config.exe == EX_WIN32);
+                *reg = ST01;
+                break;
+            }
             assert(I64 || tyfloating(tym));
             goto case 4;
 
@@ -1398,6 +1445,11 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
                 break;
             }
             else if (tybasic(tym) == TYcldouble)
+            {
+                *reg = ST01;
+                break;
+            }
+            else if (tycomplex(tym) && tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
             {
                 *reg = ST01;
                 break;
