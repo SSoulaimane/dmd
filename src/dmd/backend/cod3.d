@@ -1146,10 +1146,6 @@ static if (NTEXCEPTIONS)
             if ((mask(reg1) | mask(reg2)) & (mST0 | mST01))
             {
                 assert(reg1 == lreg && reg2 == NOREG);
-                // balance `stackused` (funccall() calls push87())
-                pop87();
-                if (reg1 == ST01)
-                    pop87();
             }
             // fix return registers
             else if (reg2 == NOREG)
