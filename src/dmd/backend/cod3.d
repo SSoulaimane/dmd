@@ -1114,6 +1114,7 @@ static if (NTEXCEPTIONS)
                 lreg = mask(reg1) & mLSW ? reg1 : AX;
                 mreg = mask(reg2) & mMSW ? reg2 : DX;
             }
+            retregs = (mask(lreg) | mask(mreg)) & ~mask(NOREG);
 
             // For the final load into the return regs, don't set regcon.used,
             // so that the optimizer can potentially use retregs for register
@@ -1164,7 +1165,7 @@ static if (NTEXCEPTIONS)
                 else
                     genmovreg(cdb, reg2, mreg);
             }
-            retregs = mask(reg1) | mask(reg2);
+            retregs = (mask(reg1) | mask(reg2)) & ~mask(NOREG);
             goto L4;
 
         case BCret:
