@@ -23,6 +23,7 @@ import core.stdc.stdlib;
 import core.stdc.string;
 
 import dmd.backend.cc;
+import dmd.backend.code;
 import dmd.backend.cdef;
 import dmd.backend.code_x86;
 import dmd.backend.oper;
@@ -3273,14 +3274,6 @@ elem * elstruct(elem *e, goal_t goal)
 
     uint sz = (e.Eoper == OPstrpar && type_zeroSize(t, global_tyf)) ? 0 : cast(uint)type_size(t);
     //printf("\tsz = %d\n", (int)sz);
-    if (sz == 16)
-    {
-        while (ty == TYarray && t.Tdim == 1)
-        {
-            t = t.Tnext;
-            ty = tybasic(t.Tty);
-        }
-    }
 
     type *targ1 = null;
     type *targ2 = null;
@@ -3288,6 +3281,14 @@ elem * elstruct(elem *e, goal_t goal)
     {   // If a struct is a wrapper for another type, prefer that other type
         targ1 = t.Ttag.Sstruct.Sarg1type;
         targ2 = t.Ttag.Sstruct.Sarg2type;
+    }
+
+    if (ty == TYarray && sz)
+    {
+        argtypes(t, &targ1, &targ2);
+        if (!targ1)
+            goto Ldefault;
+        goto L1;
     }
 
 //if (targ1) { printf("targ1\n"); type_print(targ1); }
@@ -3364,7 +3365,7 @@ elem * elstruct(elem *e, goal_t goal)
             goto Ldefault;
 
         L1:
-            if (ty == TYstruct)
+            if (ty == TYstruct || ty == TYarray)
             {   // This needs to match what TypeFunction::retStyle() does
                 if (config.exe == EX_WIN64)
                 {
@@ -3389,6 +3390,8 @@ elem * elstruct(elem *e, goal_t goal)
                     else
                         tym = TYucent;
                 }
+                else if (I32 && targ1 && targ2)
+                    tym = TYllong;
                 assert(tym != TYstruct);
             }
             assert(tym != ~0);
