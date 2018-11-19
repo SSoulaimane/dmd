@@ -908,7 +908,8 @@ Lagain:
 
             TypeStruct tc = cast(TypeStruct)tb;
             StructDeclaration sd = tc.sym;
-            if (sd.arg1type && !sd.arg2type)
+            if (sd.arg1type && !sd.arg2type
+                && sd.arg1type.size() == sz)
             {
                 tb = sd.arg1type;
                 goto Lagain;
@@ -978,7 +979,7 @@ Lagain:
             if (r == RTLSYM_MEMSETN)
             {
                 // void *_memsetn(void *p, void *value, int dim, int sizelem)
-                evalue = el_una(OPaddr, TYnptr, evalue);
+                evalue = addressElem(evalue, tb);
                 elem *esz = el_long(TYsize_t, sz);
                 elem *e = el_params(esz, edim, evalue, eptr, null);
                 e = el_bin(OPcall,TYnptr,el_var(getRtlsym(r)),e);
