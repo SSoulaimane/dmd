@@ -2970,6 +2970,14 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
             return 1;
         }
 
+        if (tybasic(ty) == TYcfloat
+            && fpr.numfloatregs - fpr.xmmcnt >= 1)
+        {
+            // Allocate XMM register
+            *preg1 = fpr.floatregs[fpr.xmmcnt++];
+            return 1;
+        }
+
         if (vararg && tysimd(ty) && tysize(ty) >= 32)
         {
             return 0;
@@ -3276,12 +3284,17 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                 ++xmmcnt;
             int preg2 = parameters[i].reg2;
             reg_t mreg,lreg;
-            if (preg2 != NOREG)
+            if (preg2 != NOREG || tybasic(ep.Ety) == TYcfloat)
             {
                 if (mask(preg2) & XMMREGS)
                     ++xmmcnt;
                 assert(ep.Eoper != OPstrthis);
-                if (mask(preg) & XMMREGS)
+                if (tybasic(ep.Ety) == TYcfloat)
+                {
+                    lreg = ST01;
+                    mreg = NOREG;
+                }
+                else if (mask(preg) & XMMREGS)
                 {
                     lreg = XMM0;
                     mreg = XMM1;
@@ -3291,7 +3304,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                     lreg = mask(preg ) & mLSW ? cast(reg_t)preg  : AX;
                     mreg = mask(preg2) & mMSW ? cast(reg_t)preg2 : DX;
                 }
-                retregs = mask(mreg) | mask(lreg);
+                retregs = (mask(mreg) | mask(lreg)) & ~mask(NOREG);
 
                 CodeBuilder cdbsave;
                 cdbsave.ctor();
@@ -3325,6 +3338,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                     retregs |= mask(preg);
                 if (preg2 != mreg)
                     retregs |= mask(preg2);
+                retregs &= ~mask(NOREG);
                 getregs(cdb,retregs);
 
                 tym_t ty1 = tybasic(ep.Ety);
@@ -3345,7 +3359,30 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                 else if (tybasic(ty1) == TYcdouble)
                     ty1 = ty2 = TYdouble;
 
-                for (int v = 0; v < 2; v++)
+                if (ty1 == TYcfloat)
+                {
+                    assert(I64);
+                    assert(lreg == ST01 && mreg == NOREG);
+                    // spill
+                    pop87();
+                    pop87();
+                    cdb.genfltreg(0xD9, 3, tysize(TYfloat));
+                    genfwait(cdb);
+                    cdb.genfltreg(0xD9, 3, 0);
+                    genfwait(cdb);
+                    // reload
+                    if (config.exe == EX_WIN64)
+                    {
+                        cdb.genfltreg(LOD, preg, 0);
+                        code_orrex(cdb.last(), REX_W);
+                    }
+                    else
+                    {
+                        assert(mask(preg) & XMMREGS);
+                        cdb.genxmmreg(xmmload(TYdouble), preg, 0, TYdouble);
+                    }
+                }
+                else for (int v = 0; v < 2; v++)
                 {
                     if (v ^ (preg != mreg))
                         genmovreg(cdb, preg, lreg, ty1);
@@ -3353,7 +3390,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
                         genmovreg(cdb, preg2, mreg, ty2);
                 }
 
-                retregs = mask(preg) | mask(preg2);
+                retregs = (mask(preg) | mask(preg2)) & ~mask(NOREG);
             }
             else if (ep.Eoper == OPstrthis)
             {
@@ -3832,6 +3869,35 @@ static if (0)
             }
             retregs = mask(lreg) | mask(mreg);
         }
+    }
+
+    /* Special handling for functions which return complex float in XMM0 or RAX. */
+
+    if (I64 && *pretregs && tybasic(e.Ety) == TYcfloat)
+    {
+        assert(reg2 == NOREG);
+        // spill
+        if (config.exe == EX_WIN64)
+        {
+            assert(reg1 == AX);
+            cdb.genfltreg(STO, reg1, 0);
+            code_orrex(cdb.last(), REX_W);
+        }
+        else
+        {
+            assert(reg1 == XMM0);
+            cdb.genxmmreg(xmmstore(TYdouble), reg1, 0, TYdouble);
+        }
+        // reload real
+        push87(cdb);
+        cdb.genfltreg(0xD9, 0, 0);
+        genfwait(cdb);
+        // reload imaginary
+        push87(cdb);
+        cdb.genfltreg(0xD9, 0, tysize(TYfloat));
+        genfwait(cdb);
+
+        retregs = mST01;
     }
 
     fixresult(cdb, e, retregs, pretregs);
