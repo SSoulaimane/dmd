@@ -2931,6 +2931,15 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
         }
     }
 
+    if (config.exe == EX_WIN64)
+    {
+        // see type_jparam2()
+    }
+    else if (I64 && tybasic(ty) == TYarray)
+    {
+        ty = argtypeof(ty, t);
+    }
+
     reg_t* preg = preg1;
     int regcntsave = fpr.regcnt;
     int xmmcntsave = fpr.xmmcnt;
@@ -3021,6 +3030,44 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
         ty = ty2;
     }
     return 1;
+}
+
+/***************************************
+ * Selects a scalar type to replace an aggregate type for argument passing
+ * and return values.
+ *
+ * Note: the size of the scalar replacement may be greater or equal
+ *       to the size of the aggregate.
+ *
+ * Returns:
+ *  - a scalar type replacement for an aggregate type.
+ *  - the type unchanged if not an aggregate or no suitable replacement.
+ */
+tym_t argtypeof(tym_t ty, type* t)
+{
+    if (!tyaggregate(ty))
+        return ty;
+
+    assert(t);
+
+    if (tybasic(ty) == TYarray)
+    {
+        targ_size_t sz = type_size(t);
+        if (sz > 0 && sz <= 16)
+        {
+            ty = sz == 1 ? TYuchar
+               : sz == 2 ? TYushort
+               : sz <= 4 ? TYulong
+               : sz <= 8 ? TYullong
+               : TYucent;
+        }
+    }
+    else if (tybasic(ty) == TYstruct)
+    {
+
+    }
+
+    return ty;
 }
 
 /*******************************

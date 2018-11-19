@@ -4028,10 +4028,11 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, regm_t* n
                 uint preg = s.Spreg;
                 for (int i = 0; i < 2; ++i)     // twice, once for each possible parameter register
                 {
+                    tym_t tym = argtypeof(t.Tty, t);
                     shadowregm |= mask(preg);
                     int op = 0x89;                  // MOV x[EBP],preg
                     if (XMM0 <= preg && preg <= XMM15)
-                        op = xmmstore(t.Tty);
+                        op = xmmstore(tym);
                     if (!(pushalloc && preg == pushallocreg) || s.Sclass == SCshadowreg)
                     {
                         if (hasframe)
