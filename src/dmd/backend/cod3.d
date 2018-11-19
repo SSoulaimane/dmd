@@ -1337,7 +1337,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
     if (ty & mTYreplaced)
     {
         assert(t);
-        ty = t.Tty;
+        ty1 = t.Tty;
     }
 
     switch (tyrelax(ty1))
