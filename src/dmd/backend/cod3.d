@@ -1380,7 +1380,15 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case TYarray:
-            return 0;
+            type* targ1, targ2;
+            argtypes(t, &targ1, &targ2);
+            if (targ1)
+                ty1 = targ1.Tty;
+            else
+                return 0;
+            if (targ2)
+                ty2 = targ2.Tty;
+            break;
 
         case TYstruct:
             assert(t);
@@ -4000,12 +4008,22 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, regm_t* n
 
             type *t = s.Stype;
             type *t2 = null;
-            if (tybasic(t.Tty) == TYstruct && config.exe != EX_WIN64)
+            if (tyaggregate(t.Tty) && config.exe != EX_WIN64)
             {
-                type *targ1 = t.Ttag.Sstruct.Sarg1type;
-                t2 = t.Ttag.Sstruct.Sarg2type;
-                if (targ1)
-                    t = targ1;
+                if (tybasic(t.Tty) == TYstruct)
+                {
+                    type *targ1 = t.Ttag.Sstruct.Sarg1type;
+                    t2 = t.Ttag.Sstruct.Sarg2type;
+                    if (targ1)
+                        t = targ1;
+                }
+                else if (tybasic(t.Tty) == TYarray)
+                {
+                    type *targ1;
+                    argtypes(t, &targ1, &t2);
+                    if (targ1)
+                        t = targ1;
+                }
             }
 
             if (Symbol_Sisdead(s, anyiasm))
