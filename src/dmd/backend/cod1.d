@@ -1835,26 +1835,46 @@ void fixresult(ref CodeBuilder cdb, elem *e, regm_t retregs, regm_t *pretregs)
             if (retregs & XMMREGS)
             {
                 reg = findreg(retregs & XMMREGS);
-                // MOVSD floatreg, XMM?
-                cdb.genxmmreg(xmmstore(tym), reg, 0, tym);
-                if (mask(rreg) & XMMREGS)
-                    // MOVSD XMM?, floatreg
-                    cdb.genxmmreg(xmmload(tym), rreg, 0, tym);
-                else
+
+                if (e.Ety & mTYreplaced
+                    && !OTleaf(e.Eoper) && tysimd(e.EV.E1.Ety))
                 {
-                    // MOV rreg,floatreg
-                    cdb.genfltreg(0x8B,rreg,0);
-                    if (sz == 8)
+                    // SIMD vector casted to static array
+                    assert(I64);
+
+                    // MOVSD floatreg, XMM?
+                    cdb.genxmmreg(xmmstore(TYfloat4), reg, 0, TYfloat4);
+
+                    uint lsreg = findreg(forregs & (mLSW|XMMREGS)),
+                         msreg = findreg(forregs & (mMSW|XMMREGS)) & ~mask(lsreg);
+
+                    rreg = lsreg;
+                    uint offset = 0;
+                    for (uint v = 0; v < 2; ++v)
                     {
-                        if (I32)
-                        {
-                            rreg = findregmsw(*pretregs);
-                            cdb.genfltreg(0x8B, rreg,4);
-                        }
+                        if (mask(rreg) & XMMREGS)
+                            cdb.genxmmreg(xmmload(TYdouble), rreg, offset, TYdouble);    // MOVSD XMM?, floatreg
                         else
+                        {
+                            cdb.genfltreg(LOD, rreg, offset);   // MOV rreg,floatreg
                             code_orrex(cdb.last(),REX_W);
+                        }
+                        rreg = msreg;
+                        offset = 8;
                     }
                 }
+                else if (sz == 8 && I32)
+                {
+                    // MOVSD floatreg, XMM?
+                    cdb.genxmmreg(xmmstore(tym), reg, 0, tym);
+
+                    // MOV rreg,floatreg
+                    cdb.genfltreg(0x8B,rreg,0);
+                    rreg = findregmsw(*pretregs);
+                    cdb.genfltreg(0x8B, rreg,4);
+                }
+                else
+                    genmovreg(cdb, rreg, reg, tym);
             }
             else if (forregs & XMMREGS)
             {
