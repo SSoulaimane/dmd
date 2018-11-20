@@ -1334,12 +1334,13 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
     if (tybasic(ty) == TYvoid)
         return 0;
 
-    if (ty & mTYreplaced)
+    if (tybasic(ty) == TYstruct || ty & mTYreplaced)
     {
         assert(t);
         ty1 = t.Tty;
     }
 
+Lagain:
     switch (tyrelax(ty1))
     {
         case TYcent:
@@ -1380,14 +1381,16 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case TYarray:
-            return 0;
+            ty1 = argtypeof(ty1, t);
+            if (ty1 == TYarray)
+                return 0;
+            goto Lagain;
 
         case TYstruct:
             assert(t);
             if (I64 && config.exe != EX_WIN64)
             {
-                if (t.Tty != TYstruct)
-                    return 0;
+                assert(tybasic(t.Tty) == TYstruct);
                 type *targ1 = t.Ttag.Sstruct.Sarg1type;
                 type *targ2 = t.Ttag.Sstruct.Sarg2type;
                 if (targ1)
