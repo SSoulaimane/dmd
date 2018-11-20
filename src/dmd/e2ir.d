@@ -4690,6 +4690,8 @@ elem *toElem(Expression e, IRState *irs)
             // Adjust for any type paints
             t = ce.type.toBasetype();
             e.Ety = totym(t);
+            if (tyaggregate(e.Ety))
+                e.ET = Type_toCtype(t);
 
             elem_setLoc(e, ce.loc);
             return e;
