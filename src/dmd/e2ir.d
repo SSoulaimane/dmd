@@ -4223,6 +4223,8 @@ elem *toElem(Expression e, IRState *irs)
                 // Adjust for any type paints
                 Type t = ce.type.toBasetype();
                 e.Ety = totym(t);
+                if (tyaggregate(e.Ety))
+                    e.ET = Type_toCtype(t);
 
                 elem_setLoc(e, ce.loc);
                 return e;
@@ -4398,7 +4400,21 @@ elem *toElem(Expression e, IRState *irs)
             if (fty == Tvector && tty == Tsarray)
             {
                 if (tfrom.size() == t.size())
+                {
+                    if (e.Eoper != OPvar && e.Eoper != OPind)
+                    {
+                        // can't perform array ops on it unless it's in memory
+                        type *tfx = Type_toCtype(tfrom);
+                        Symbol *stmp = symbol_genauto(tfx);
+                        elem *eeq = elAssign(el_var(stmp), e, tfrom, tfx);
+                        elem *ev = el_var(stmp);
+                        ev.Ety = TYarray;
+                        ev.ET = Type_toCtype(t);
+                        e = el_bin(OPcomma, TYarray, eeq, ev);
+                        e.ET = Type_toCtype(t);
+                    }
                     return Lret(ce, e);
+                }
             }
 
             ftym = tybasic(e.Ety);
