@@ -1348,6 +1348,8 @@ elem *el_picvar(Symbol *s)
     e.Eoper = OPvar;
     e.EV.Vsym = s;
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
 
     switch (s.Sclass)
     {
@@ -1495,6 +1497,8 @@ elem *el_picvar(Symbol *s)
     e.Eoper = OPvar;
     e.EV.Vsym = s;
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
 
     /* For 32 bit:
      *      CALL __i686.get_pc_thunk.bx@PC32
@@ -1709,6 +1713,8 @@ static if (TARGET_LINUX || TARGET_FREEBSD || TARGET_OPENBSD || TARGET_DRAGONFLYB
     e.EV.Vsym = s;
     type_debug(s.Stype);
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
     if (s.Stype.Tty & mTYthread)
     {
         //printf("thread local %s\n", s.Sident);
