@@ -369,6 +369,7 @@ Loop:
 
                                 go.changes++;
                                 em.Ety = e.Ety;
+                                em.ET = e.ET;
                                 el_copy(e,em);
                                 em.EV.E1 = em.EV.E2 = null;
                                 em.Eoper = OPconst;

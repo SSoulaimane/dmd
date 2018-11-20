@@ -287,6 +287,7 @@ private void conpropwalk(elem *n,vec_t IN)
 
                         e = el_copytree(e);
                         e.Ety = t.Ety;
+                        e.ET = t.ET;
                         n.EV.E2 = el_bin(opeqtoop(op),n.Ety,e,n.EV.E2);
                         n.Eoper = OPeq;
                     }
@@ -382,10 +383,13 @@ private void conpropwalk(elem *n,vec_t IN)
         elem *e = chkprop(n,rdl);
         if (e)
         {   tym_t nty;
+            type *nt;
 
             nty = n.Ety;
+            nt = n.ET;
             el_copy(n,e);
             n.Ety = nty;                       // retain original type
+            n.ET = nt;
         }
         list_free(&rdl);
     }

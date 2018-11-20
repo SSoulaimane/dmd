@@ -2226,6 +2226,7 @@ L2:
   /* c,e => e   */
   if (OTleaf(e1op) && !OTsideff(e1op) && !(e1.Ety & mTYvolatile))
   {     e2.Ety = e.Ety;
+        e2.ET = e.ET;
         e = el_selecte2(e);
         goto Lret;
   }
@@ -2271,6 +2272,7 @@ L2:
                 )
         {   // ((a = b),(a < 0)) => ((a = b) < 0)
             e1.Ety = e2.EV.E1.Ety;
+            e1.ET = e2.EV.E1.ET;
             e.EV.E1 = e2.EV.E1;
             e2.EV.E1 = e1;
             goto L1;
@@ -2283,6 +2285,7 @@ L2:
         {
             /* ((a = b),(a || c)) => ((a = b) || c)     */
             e1.Ety = e2.EV.E1.Ety;
+            e1.ET = e2.EV.E1.ET;
             e.EV.E1 = e2.EV.E1;
             e2.EV.E1 = e1;
             e = el_selecte2(e);
@@ -2301,6 +2304,7 @@ L2:
             {
                 e.EV.E1 = e2.EV.E2;
                 e1.Ety = e2.EV.E2.Ety;
+                e1.ET = e2.EV.E2.ET;
                 e2.EV.E2 = e1;
                 goto L1;
             }
@@ -3437,6 +3441,7 @@ elem * elstruct(elem *e, goal_t goal)
             // Convert (x streq (a?y:z)) to (x streq *(a ? &y : &z))
             if (e2.Eoper == OPcond)
             {   tym_t ty2 = e2.Ety;
+                type *t2  = e2.ET;
 
                 /* We should do the analysis to see if we can use
                    something simpler than TYfptr.
@@ -3445,6 +3450,7 @@ elem * elstruct(elem *e, goal_t goal)
                 e2 = el_una(OPaddr,typ,e2);
                 e2 = optelem(e2,GOALvalue);          /* distribute & to x and y leaves */
                 *pe2 = el_una(OPind,ty2,e2);
+                (*pe2).ET = t2;
                 break;
             }
             break;
@@ -5232,6 +5238,8 @@ beg:
                         goto retnull;
                     if (!goal)
                         e.Ety = e.EV.E2.Ety;
+                    else
+                        e.EV.E2.ET = e.ET;
                     e = el_selecte2(e);
                     return e;
                 }
@@ -5240,7 +5248,10 @@ beg:
                     return el_selecte1(e);
                 }
                 if (!goal)
+                {
                     e.Ety = e2.Ety;
+                    e.ET = e2.ET;
+                }
                 return e;
             }
 
@@ -5720,7 +5731,9 @@ private elem *elToPair(elem *e)
                     e.Ety = ty0;
                     elem *e2 = el_copytree(e);
                     e2.EV.Voffset += _tysize[tybasic(ty0)];
-                    return el_bin(OPpair, ty, e, e2);
+                    elem *ep = el_bin(OPpair, ty, e, e2);
+                    ep.ET = e.ET;
+                    return ep;
 
                 default:
                     break;
@@ -5749,7 +5762,9 @@ private elem *elToPair(elem *e)
                         fixside(&e.EV.E1, &e2);
                     e2 = el_bin(OPadd,e2.Ety,e2,el_long(TYsize, _tysize[tybasic(ty0)]));
                     e2 = el_una(OPind, ty0, e2);
-                    return el_bin(OPpair, ty, e, e2);
+                    elem *ep = el_bin(OPpair, ty, e, e2);
+                    ep.ET = e.ET;
+                    return ep;
 
                 default:
                     break;

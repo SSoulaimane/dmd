@@ -948,7 +948,7 @@ static if (0)
     e.Eoper = cast(ubyte)op;
     e.EV.E1 = e1;
     e.EV.E2 = e2;
-    if (op == OPcomma && tyaggregate(ty))
+    if (op == OPcomma)
         e.ET = e2.ET;
     return e;
 }
@@ -1348,6 +1348,8 @@ elem *el_picvar(Symbol *s)
     e.Eoper = OPvar;
     e.EV.Vsym = s;
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
 
     switch (s.Sclass)
     {
@@ -1495,6 +1497,8 @@ elem *el_picvar(Symbol *s)
     e.Eoper = OPvar;
     e.EV.Vsym = s;
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
 
     /* For 32 bit:
      *      CALL __i686.get_pc_thunk.bx@PC32
@@ -1709,6 +1713,8 @@ static if (TARGET_LINUX || TARGET_FREEBSD || TARGET_OPENBSD || TARGET_DRAGONFLYB
     e.EV.Vsym = s;
     type_debug(s.Stype);
     e.Ety = s.ty();
+    if (tyaggregate(e.Ety))
+        e.ET = s.Stype;
     if (s.Stype.Tty & mTYthread)
     {
         //printf("thread local %s\n", s.Sident);
@@ -2131,6 +2137,7 @@ elem *el_convfloat(elem *e)
 
     go.changes++;
     tym_t ty = e.Ety;
+    type *t = e.ET;
     int sz = tysize(ty);
     assert(sz <= buffer.length);
     void *p;
@@ -2194,6 +2201,7 @@ printf("\n");
     el_free(e);
     e = el_var(s);
     e.Ety = ty;
+    e.ET = t;
     if (e.Eoper == OPvar)
         e.Ety |= mTYconst;
     //printf("s: %s %d:x%x\n", s.Sident, s.Sseg, s.Soffset);
@@ -2219,6 +2227,7 @@ static if (0)
 
     go.changes++;
     tym_t ty = e.Ety;
+    type *t = e.ET;
     int sz = tysize(ty);
     assert(sz <= buffer.length);
     void *p = &e.EV;
@@ -2234,6 +2243,7 @@ printf("\n");
     el_free(e);
     e = el_var(s);
     e.Ety = ty;
+    e.ET = t;
     if (e.Eoper == OPvar)
         e.Ety |= mTYconst;
     //printf("s: %s %d:x%x\n", s.Sident, s.Sseg, s.Soffset);
@@ -2319,6 +2329,7 @@ L1:
     // Refer e to the symbol generated
     elem *ex = el_ptr(s);
     ex.Ety = e.Ety;
+    ex.ET = e.ET;
     if (e.EV.Voffset)
     {
         if (ex.Eoper == OPrelconst)
