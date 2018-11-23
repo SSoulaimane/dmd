@@ -3081,6 +3081,30 @@ tym_t argtypeof(tym_t ty, type* t)
                : sz <= 8 ? TYullong
                : TYucent;
         }
+
+        if (I64 && config.exe != EX_WIN64)
+        {
+            tym_t tty = t.Tty;
+            while (tty == TYarray)
+            {
+                t = t.Tnext;
+                assert(t);
+                tty = tybasic(t.Tty);
+            }
+
+            if (sz == tysize(tty)
+                && (tysimd(tty) || tybasic(tty) == TYldouble || tybasic(tty) == TYildouble))
+            {
+                ty = tty;
+            }
+            else if (sz <= 16)
+            {
+                if (tyfloating(tty))
+                    ty = sz <= 4 ? TYfloat
+                       : sz <= 8 ? TYdouble
+                       : TYcdouble;
+            }
+        }
     }
     else if (tybasic(ty) == TYstruct)
     {
