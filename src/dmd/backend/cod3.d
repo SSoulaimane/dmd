@@ -1340,7 +1340,6 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
         ty1 = t.Tty;
     }
 
-Lagain:
     switch (tyrelax(ty1))
     {
         case TYcent:
@@ -1381,10 +1380,15 @@ Lagain:
             break;
 
         case TYarray:
-            ty1 = argtypeof(ty1, t);
-            if (ty1 == TYarray)
+            type* targ1, targ2;
+            argtypes(t, &targ1, &targ2);
+            if (targ1)
+                ty1 = targ1.Tty;
+            else
                 return 0;
-            goto Lagain;
+            if (targ2)
+                ty2 = targ2.Tty;
+            break;
 
         case TYstruct:
             assert(t);
@@ -4007,12 +4011,22 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, regm_t* n
 
             type *t = s.Stype;
             type *t2 = null;
-            if (tybasic(t.Tty) == TYstruct && config.exe != EX_WIN64)
+            if (tyaggregate(t.Tty) && config.exe != EX_WIN64)
             {
-                type *targ1 = t.Ttag.Sstruct.Sarg1type;
-                t2 = t.Ttag.Sstruct.Sarg2type;
-                if (targ1)
-                    t = targ1;
+                if (tybasic(t.Tty) == TYstruct)
+                {
+                    type *targ1 = t.Ttag.Sstruct.Sarg1type;
+                    t2 = t.Ttag.Sstruct.Sarg2type;
+                    if (targ1)
+                        t = targ1;
+                }
+                else if (tybasic(t.Tty) == TYarray)
+                {
+                    type *targ1;
+                    argtypes(t, &targ1, &t2);
+                    if (targ1)
+                        t = targ1;
+                }
             }
 
             if (Symbol_Sisdead(s, anyiasm))
@@ -4031,11 +4045,10 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, regm_t* n
                 uint preg = s.Spreg;
                 for (int i = 0; i < 2; ++i)     // twice, once for each possible parameter register
                 {
-                    tym_t tym = argtypeof(t.Tty, t);
                     shadowregm |= mask(preg);
                     int op = 0x89;                  // MOV x[EBP],preg
                     if (XMM0 <= preg && preg <= XMM15)
-                        op = xmmstore(tym);
+                        op = xmmstore(t.Tty);
                     if (!(pushalloc && preg == pushallocreg) || s.Sclass == SCshadowreg)
                     {
                         if (hasframe)

@@ -3241,8 +3241,8 @@ elem * elstruct(elem *e, goal_t goal)
 
     if (ty == TYarray)
     {
-        tym = argtypeof(ty, t);
-        if (tybasic(tym) == TYarray)
+        argtypes(t, &targ1, &targ2);
+        if (!targ1)
             goto Ldefault;
         goto L1;
     }
@@ -3304,7 +3304,7 @@ elem * elstruct(elem *e, goal_t goal)
             goto Ldefault;
 
         L1:
-            if (ty == TYstruct)
+            if (ty == TYstruct || ty == TYarray)
             {   // This needs to match what TypeFunction::retStyle() does
                 if (config.exe == EX_WIN64)
                 {

@@ -2957,7 +2957,18 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
     }
     else if (I64 && tybasic(ty) == TYarray)
     {
-        ty = argtypeof(ty, t);
+        type* targ1, targ2;
+        argtypes(t, &targ1, &targ2);
+        if (targ1)
+        {
+            t = targ1;
+            ty = t.Tty;
+            if (targ2)
+            {
+                t2 = targ2;
+                ty2 = t2.Tty;
+            }
+        }
     }
 
     reg_t* preg = preg1;
@@ -3053,56 +3064,89 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
 }
 
 /***************************************
- * Selects a scalar type to replace an aggregate type for argument passing
- * and return values.
- *
- * Note: the size of the scalar replacement may be greater or equal
- *       to the size of the aggregate.
- *
- * Returns:
- *  - a scalar type replacement for an aggregate type.
- *  - the type unchanged if not an aggregate or no suitable replacement.
+ * Finds replacemnt types for register passing of aggregates.
  */
-tym_t argtypeof(tym_t ty, type* t)
+void argtypes(type *t, type **arg1type, type **arg2type)
 {
-    if (!tyaggregate(ty))
-        return ty;
+    if (!t) return;
 
-    assert(t);
+    tym_t ty = t.Tty;
+
+    if (!tyaggregate(ty))
+        return;
+
+    *arg1type = *arg2type = null;
 
     if (tybasic(ty) == TYarray)
     {
-        targ_size_t sz = type_size(t);
+        size_t sz = type_size(t);
         if (sz > 0 && sz <= 16)
         {
-            ty = sz == 1 ? TYuchar
-               : sz == 2 ? TYushort
-               : sz <= 4 ? TYulong
-               : sz <= 8 ? TYullong
-               : TYucent;
+            type **argtype = arg1type;
+            size_t argsz = sz < 8 ? sz : 8;
+            foreach (v; 0 .. (sz > 8) + 1)
+            {
+                *argtype = argsz == 1 ? tstypes[TYchar]
+                         : argsz == 2 ? tstypes[TYshort]
+                         : argsz <= 4 ? tstypes[TYlong]
+                         : tstypes[TYllong];
+                argtype = arg2type;
+                argsz = sz - 8;
+            }
         }
 
         if (I64 && config.exe != EX_WIN64)
         {
-            tym_t tty = t.Tty;
-            while (tty == TYarray)
+            type *tn = t.Tnext;
+            tym_t tyn = tn.Tty;
+            while (tyn == TYarray)
             {
-                t = t.Tnext;
-                assert(t);
-                tty = tybasic(t.Tty);
+                tn = tn.Tnext;
+                assert(tn);
+                tyn = tybasic(tn.Tty);
             }
 
-            if (sz == tysize(tty)
-                && (tysimd(tty) || tybasic(tty) == TYldouble || tybasic(tty) == TYildouble))
+            if (tybasic(tyn) == TYstruct)
             {
-                ty = tty;
+                if (type_size(tn) == sz) // array(s) of size 1
+                {
+                    *arg1type = tn.Ttag.Sstruct.Sarg1type;
+                    *arg2type = tn.Ttag.Sstruct.Sarg2type;
+                    return;
+                }
+
+                type *t1 = tn.Ttag.Sstruct.Sarg1type;
+                if (t1)
+                {
+                    tn = t1;
+                    tyn = tn.Tty;
+                }
             }
-            else if (sz <= 16)
+
+            if (sz == tysize(tyn))
             {
-                if (tyfloating(tty))
-                    ty = sz <= 4 ? TYfloat
-                       : sz <= 8 ? TYdouble
-                       : TYcdouble;
+                if (tysimd(tyn))
+                {
+                    type *ts = type_fake(tybasic(tyn));
+                    ts.Tcount = 1;
+                    *arg1type = ts;
+                    return;
+                }
+                else if (tybasic(tyn) == TYldouble || tybasic(tyn) == TYildouble)
+                {
+                    *arg1type = tstypes[tybasic(tyn)];
+                    return;
+                }
+            }
+
+            if (sz <= 16)
+            {
+                if (tyfloating(tyn))
+                {
+                    *arg1type = sz <= 4 ? tstypes[TYfloat] : tstypes[TYdouble];
+                    if (sz > 8)
+                        *arg2type = (sz - 8) <= 4 ? tstypes[TYfloat] : tstypes[TYdouble];
+                }
             }
         }
     }
@@ -3110,8 +3154,6 @@ tym_t argtypeof(tym_t ty, type* t)
     {
 
     }
-
-    return ty;
 }
 
 /*******************************
