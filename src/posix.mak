@@ -358,7 +358,7 @@ BACK_DOBJS = bcomplex.o evalu8.o divcoeff.o dvec.o go.o gsroa.o glocal.o gdag.o 
 	gloop.o compress.o cgelem.o cgcs.o ee.o cod4.o cod5.o nteh.o blockopt.o memh.o cg.o cgreg.o \
 	dtype.o debugprint.o symbol.o elem.o dcode.o cgsched.o cg87.o cgxmm.o cgcod.o cod1.o cod2.o \
 	cod3.o cv8.o dcgcv.o pdata.o util2.o var.o md5.o backconfig.o ph2.o drtlsym.o dwarfeh.o ptrntab.o \
-	aarray.o dvarstats.o dwarfdbginf.o elfobj.o cgen.o os.o
+	aarray.o dvarstats.o dwarfdbginf.o elfobj.o cgen.o os.o argtypesv64.o
 
 G_OBJS  = $(addprefix $G/, $(BACK_OBJS))
 G_DOBJS = $(addprefix $G/, $(BACK_DOBJS))
@@ -404,6 +404,7 @@ BACK_SRC = \
 	$C/dvarstats.d $C/dvec.d \
 	$C/md5.d \
 	$C/ph2.d $C/util2.d $C/dwarfeh.d $C/goh.d $C/memh.d $C/filespec.d \
+	$C/argtypesv64.d \
 	$(TARGET_CH)
 
 TK_SRC = \

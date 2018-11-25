@@ -155,16 +155,20 @@ public:
         {
             // Create a new backend type
             StructDeclaration sym = t.sym;
-            t.ctype = type_struct_class(sym.toPrettyChars(true), sym.alignsize, sym.structsize, sym.arg1type ? Type_toCtype(sym.arg1type) : null, sym.arg2type ? Type_toCtype(sym.arg2type) : null, sym.isUnionDeclaration() !is null, false, sym.isPOD() != 0, sym.hasNoFields);
+            t.ctype = type_struct_class(sym.toPrettyChars(true), sym.alignsize, sym.structsize, null, null, sym.isUnionDeclaration() !is null, false, sym.isPOD() != 0, sym.hasNoFields);
             /* Add in fields of the struct
              * (after setting ctype to avoid infinite recursion)
              */
-            if (global.params.symdebug)
+            foreach (v; sym.fields)
+                symbol_struct_addField(cast(Symbol*)t.ctype.Ttag, v.ident.toChars(), Type_toCtype(v.type), v.offset);
+
+            if (1)
             {
-                foreach (v; sym.fields)
-                {
-                    symbol_struct_addField(cast(Symbol*)t.ctype.Ttag, v.ident.toChars(), Type_toCtype(v.type), v.offset);
-                }
+                // computer replacement register types
+                // (after adding the fields)
+                import dmd.backend.argtypesv64;
+                auto s = cast(Symbol*) t.ctype.Ttag;
+                argtypesv64(t.ctype, &s.Sstruct.Sarg1type, &s.Sstruct.Sarg2type);
             }
 
             if (global.params.symdebugref)
