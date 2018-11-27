@@ -3375,6 +3375,25 @@ elem * elstruct(elem *e, goal_t goal)
             tym |= mTYreplaced;
             switch (e.Eoper)
             {   case OPstreq:
+                    if (sz != tysize(tym))  // is the rest just padding? always?
+                    {
+                        elem *e2 = e.EV.E2;
+                        if (e2.Eoper != OPvar && e2.Eoper != OPind)
+                        {   // rvalue to temporary lvalue
+                            Symbol *stmp = symbol_genauto(tym);
+                            stmp.Sfl |= FLauto;
+                            e2 = el_bin(OPeq, e2.Ety, el_var(stmp), e2);
+                            e2.ET = e.ET;
+                            elstructwalk(e2, tym);
+                            e2 = optelem(e2, GOALvalue);
+                            e2 = el_bin(OPcomma, e.Ety, e2, el_var(stmp));
+                            e2.EV.E2.Ety = e.Ety;
+                            e2.EV.E2.ET = e.ET;
+                            e2.ET = e.ET;
+                            e.EV.E2 = e2;
+                        }
+                        break;
+                    }
                     e.Eoper = OPeq;
                     e.Ety = (e.Ety & ~mTYbasic) | tym;
                     elstructwalk(e.EV.E1,tym);
