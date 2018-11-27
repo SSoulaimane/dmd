@@ -951,7 +951,8 @@ Lagain:
 
             TypeStruct tc = cast(TypeStruct)tb;
             StructDeclaration sd = tc.sym;
-            if (sd.arg1type && !sd.arg2type)
+            if (sd.arg1type && !sd.arg2type
+                && sd.arg1type.size() == sz)
             {
                 tb = sd.arg1type;
                 goto Lagain;
