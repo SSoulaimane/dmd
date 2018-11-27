@@ -3345,6 +3345,25 @@ elem * elstruct(elem *e, goal_t goal)
             assert(tym != ~0);
             switch (e.Eoper)
             {   case OPstreq:
+                    if (sz != tysize(tym))  // is the rest just padding? always?
+                    {
+                        elem *e2 = e.EV.E2;
+                        while(e2.Eoper == OPcomma)
+                            e2 = e2.EV.E2;
+                        if (e2.Eoper != OPvar && e2.Eoper != OPind)
+                        {   // rvalue to temporary lvalue
+                            e2 = e.EV.E2;
+                            e2.Ety = tym;
+                            elem *ec = exp2_copytotemp(e2);
+                            e.EV.E2 = ec;
+                            elem **eeq = &ec.EV.E1;
+                            *eeq = optelem(*eeq, GOALvalue);
+                            elem *ev = ec.EV.E2;
+                            ec.Ety = ev.Ety = e.Ety;
+                            ec.ET = ev.ET = e.ET;
+                        }
+                        break;
+                    }
                     e.Eoper = OPeq;
                     e.Ety = (e.Ety & ~mTYbasic) | tym;
                     elstructwalk(e.EV.E1,tym);
