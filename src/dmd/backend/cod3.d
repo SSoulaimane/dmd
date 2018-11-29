@@ -2865,12 +2865,11 @@ void genmovreg(ref CodeBuilder cdb, uint to, uint from, tym_t tym)
         switch (_X(to, from))
         {
             case _X(AX, AX):
-                uint op = 0x89;
-                if (I16 && tysize(tym) == 4) op = 0x6689;
-                else if (  tysize(tym) == 2) op = 0x6689;
-                genregs(cdb, op, from, to);    // MOV to,from
+                genregs(cdb, 0x89, from, to);    // MOV to,from
                 if (I64 && tysize(tym) >= 8)
                     code_orrex(cdb.last(), REX_W);
+                else if (tysize(tym) == 2)
+                    code_orflag(cdb.last(), CFopsize);
                 break;
 
             case _X(XMM0, XMM0):             // MOVD/Q to,from
