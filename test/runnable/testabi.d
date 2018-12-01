@@ -1017,10 +1017,14 @@ void test4_run( T, int n )( T t )
 void dbg( T, int n )( )
 {
         import std.stdio;
-        writefln( "D %s\t[ %16x, %16x ]", T.stringof, dump[0], dump[1], );
+        writef( "D %s\t[ %16x", T.stringof, dump[0] );
+        foreach( i; 1..RegValue[n].length )
+                writef( ", %16x", dump[i] );
+        writefln( " ]" );
+
         writef(   "C %s\t[ %16x", T.stringof, RegValue[n][0] );
-        if( RegValue[n].length == 2 )
-        writef( ", %16x", RegValue[n][1] );
+        foreach( i; 1..RegValue[n].length )
+                writef( ", %16x", RegValue[n][i] );
         writefln( " ]" );
 }
 void test4()
