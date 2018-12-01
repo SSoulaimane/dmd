@@ -942,6 +942,9 @@ void test3_run( T, int n )( )
 {
         typeof(.dump) dump;
 
+        if (RegValue[n] == null)
+                return;
+
         alias test3_ret_inst = test3_ret!T;
         asm {
              call test3_ret_inst;  // DMD may pop st(0) otherwise
@@ -996,6 +999,10 @@ TEST data4 = { 4, "Check Input Register value" };
 void test4_run( T, int n )( T t )
 {
         typeof(.dump) dump;
+
+        if (RegValue[n] == null)
+                return;
+
         mixin( gen_reg_capture!(n,`["RDI","RSI"]`)() );
 
         //.dump = dump;
