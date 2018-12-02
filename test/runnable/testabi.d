@@ -1,4 +1,4 @@
-// PERMUTE_ARGS: -release -g -mcpu=native
+// PERMUTE_ARGS: -release -g
 
 import core.simd;
 
@@ -6,6 +6,12 @@ version(Windows) {}
 else version(X86_64)
 {
         version = Run_X86_64_Tests;
+}
+
+version (D_AVX2)
+{
+        /* uncomment to enable AVX tests */
+        //version = Run_AVX_Tests;
 }
 
 extern (C) int printf(const char*, ...);
@@ -23,7 +29,7 @@ alias real   R;
 version (D_SIMD)
 alias long2  X;
 
-version (D_AVX)
+version (Run_AVX_Tests)
 alias long4  Y;
 
 // Single Type
@@ -136,7 +142,7 @@ struct xb       { X a;   B b;   }
 struct xf       { X a;   F b;   }
 struct bx       { B a;   X b;   }
 
-version (D_AVX)
+version (Run_AVX_Tests)
 {
 struct y        { Y a;          }
 struct yy       { Y a,b;        }
@@ -198,7 +204,7 @@ else
         alias V16_T = tuple!();
 
                 // SIMD Vectors 32 bytes
-version (D_AVX)
+version (Run_AVX_Tests)
         alias tuple!(
                 y,yy,yb,yf,by,
                 // ---
@@ -1064,12 +1070,12 @@ void main()
 string c_generate_returns()
 {
         string value =  " 1, 2, 3, 4, 5, 6, 7, 8, 9,10,"
-                        "11,12,13,14,15,16,17,18,19,20,";
+                      ~ "11,12,13,14,15,16,17,18,19,20,";
 
         string code = "#include \"cgen.h\"\n";
 
         // Generate return functions
-        foreach( int n, T; ALL_T )
+        foreach( int n, T; tuple!(ALL_T, R_T) )
         {
                 auto Ts  = T.stringof;
                 auto len = T.tupleof.length;
@@ -1084,7 +1090,7 @@ string c_generate_returns()
 string c_generate_pass()
 {
         string value =  " 1, 2, 3, 4, 5, 6, 7, 8, 9,10,"
-                        "11,12,13,14,15,16,17,18,19,20,";
+                      ~ "11,12,13,14,15,16,17,18,19,20,";
 
         string code;
 
@@ -1111,14 +1117,15 @@ string c_generate_pass()
                 final switch( MODE )
                 {
                 case 1:
-                code ~= `"movq  %rdi, reg\n" "movq  %rsi, reg+8\n"`;
+                code ~= `"movq  %%rdi, %0\n" "movq  %%rsi, %1\n"`;
                 break;
                 case 2:
-                code ~= `"movq %xmm0, reg\n" "movq %xmm1, reg+8\n"`;
+                code ~= `"movq %%xmm0, %0\n" "movq %%xmm1, %1\n"`;
                 break;
                 case 3:
-                code ~= `"movq %xmm0, reg\n" "movq  %rdi, reg+8\n"`;
+                code ~= `"movq %%xmm0, %0\n" "movq  %%rdi, %1\n"`;
                 }
+                code ~= ` : "m="(reg[0]), "m="(reg[1]) : : "cc"`;
                 code ~= "\n);\n";
                 code ~= "}\n";
 
@@ -1134,46 +1141,61 @@ string c_generate_main()
 {
         string code = "void main() {\n";
 
-        foreach( int n, T; ALL_T )
+        foreach( int n, T; tuple!(ALL_T, R_T) )
         {
                 // Which type of compare
                 static if(n < INT_END)
                         enum MODE = 1; // Int
                 else static if(n < SSE_END)
                         enum MODE = 2; // Float
-                else    enum MODE = 3; // Mix
+                else static if (n < MIX_END)
+                        enum MODE = 3; // Mix
+                else    enum MODE = 4; // x87
 
                 auto nn  = n.stringof;
                 auto Ts  = T.stringof;
 
                 /* Begin */
 
-                code ~= `printf("/* %3d  `~Ts~`\t*/ ", `~nn~`);`"\n";
+                code ~= `printf("/* %3d  `~Ts~`\t*/ ", `~nn~`);`~"\n";
                 if( !(expected[n] & 1) )
                 {
-                        code ~= `printf("null,\n");`"\n";
+                        code ~= `printf("null,\n");`~"\n";
                         continue;
                 }
                 code ~= "asm(\n";
-                code ~= `"call func_ret_`~Ts~`\n"`"\n";
+                code ~= `"call func_ret_`~Ts~`\n"`~"\n";
                 final switch( MODE )
                 {
                 case 1:
-                code ~= `"movq  %rax, reg\n" "movq  %rdx, reg+8\n"`;
+                code ~= `"movq  %%rax, %0\n" "movq  %%rdx, %1\n"`;
                 break;
                 case 2:
-                code ~= `"movq %xmm0, reg\n" "movq %xmm1, reg+8\n"`;
+                code ~= `"movq %%xmm0, %0\n" "movq %%xmm1, %1\n"`;
                 break;
                 case 3:
-                code ~= `"movq %xmm0, reg\n" "movq  %rax, reg+8\n"`;
+                code ~= `"movq %%xmm0, %0\n" "movq  %%rax, %1\n"`;
+                break;
+                case 4:
+                code ~= `"lea %0, %%rax \n" "fstpt (%%rax)\n"`;
+                break;
                 }
+                code ~= ` : "m="(reg[0]), "m="(reg[1]) : : "cc"`;
                 code ~= "\n);\n";
 
-                code ~= `printf("[ 0x%016lx", reg.r1 );`"\n";
+                static if (RegValueSize[n].length)
+                {                
+                        enum m1 = mask(RegValueSize[n][0]);
+                        enum m2 = RegValueSize[n].length > 1 ? mask(RegValueSize[n][1]) : 0;
+                        code ~= `reg[0] &= ` ~ m1.stringof ~ `;`;
+                        code ~= `reg[1] &= ` ~ m2.stringof ~ `;`~"\n";
+                }
+
+                code ~= `printf("[ 0x%016lx", reg[0] );`~"\n";
 
                 if( T.sizeof > 8  || MODE == 3 )
-                        code ~= `printf(", 0x%016lx ],\n", reg.r2 );`"\n";
-                else    code ~= `printf(",   %015c  ],\n", ' '    );`"\n";
+                        code ~= `printf(", 0x%016lx ],\n", reg[1] );`~"\n";
+                else    code ~= `printf(",   %015c  ],\n", ' '    );`~"\n";
         }
 
         foreach( int n, T; ALL_T )
@@ -1190,27 +1212,35 @@ string c_generate_main()
 
                 /* Begin */
 
-                code ~= `printf("/* %3d  `~Ts~`\t*/ ", `~nn~`);`"\n";
+                code ~= `printf("/* %3d  `~Ts~`\t*/ ", `~nn~`);`~"\n";
                 if( !(expected[n] & 1) )
                 {
-                        code ~= `printf("null,\n");`"\n";
+                        code ~= `printf("null,\n");`~"\n";
                         continue;
                 }
                 code ~= "func_call_"~Ts~"();\n";
 
-                code ~= `printf("[ 0x%016lx", reg.r1 );`"\n";
+                static if (RegValueSize[n].length)
+                {                
+                        enum m1 = mask(RegValueSize[n][0]);
+                        enum m2 = RegValueSize[n].length > 1 ? mask(RegValueSize[n][1]) : 0;
+                        code ~= `reg[0] &= ` ~ m1.stringof ~ `;`;
+                        code ~= `reg[1] &= ` ~ m2.stringof ~ `;`~"\n";
+                }
+
+                code ~= `printf("[ 0x%016lx", reg[0] );`~"\n";
 
                 if( T.sizeof > 8  || MODE == 3 )
-                        code ~= `printf(", 0x%016lx ],\n", reg.r2 );`"\n";
-                else    code ~= `printf(",   %015c  ],\n", ' '    );`"\n";
+                        code ~= `printf(", 0x%016lx ],\n", reg[1] );`~"\n";
+                else    code ~= `printf(",   %015c  ],\n", ' '    );`~"\n";
         }
 
 
         return code ~ "}";
 }
-pragma(msg, c_generate_returns() );
-pragma(msg, c_generate_pass() );
-pragma(msg, c_generate_main() );
+//pragma(msg, c_generate_returns() );
+//pragma(msg, c_generate_pass() );
+//pragma(msg, c_generate_main() );
 // +/
 
 /+
