@@ -3079,7 +3079,7 @@ void argtypes(type *t, type **arg1type, type **arg2type)
 
     if (tybasic(ty) == TYarray)
     {
-        size_t sz = type_size(t);
+        size_t sz = cast(size_t) type_size(t);
         if (sz > 0 && sz <= 16)
         {
             type **argtype = arg1type;
