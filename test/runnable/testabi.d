@@ -25,6 +25,8 @@ alias long   L;
 alias float  F;
 alias double D;
 alias real   R;
+
+version (D_SIMD)
 alias long2  X;
 
 version (Run_AVX_Tests)
@@ -132,6 +134,8 @@ struct fr       { F a;   R b;   }
 alias  c = creal;
 
 // SIMD
+version (D_SIMD)
+{
 struct x        { X a;          }
 struct xx       { X a,b;        }
 struct xb       { X a;   B b;   }
@@ -145,7 +149,8 @@ struct yy       { Y a,b;        }
 struct yb       { Y a;   B b;   }
 struct yf       { Y a;   F b;   }
 struct by       { B a;   Y b;   }
-}
+} // Run_AVX_Tests
+} // D_SIMD
 
                 // Int Registers only
 alias tuple!(   b,bb,bbb,bbbb,bbbbb,
@@ -190,9 +195,13 @@ alias tuple!(   r,rr,rb,rf,fr,c,
 //"r","rr","rb","rf","fr",
 
                 // SIMD Vectors 16 bytes
-alias tuple!(   x,xx,xb,xf,bx,
+version (D_SIMD)
+        alias tuple!(
+                x,xx,xb,xf,bx,
                 // ---
             ) V16_T;
+else
+        alias V16_T = tuple!();
 
                 // SIMD Vectors 32 bytes
 version (Run_AVX_Tests)
