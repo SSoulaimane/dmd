@@ -1334,7 +1334,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
     if (tybasic(ty) == TYvoid)
         return 0;
 
-    if (tybasic(ty) == TYstruct || ty & mTYreplaced)
+    if (tybasic(ty) == TYstruct || (ty & mTYreplaced && tysize(ty) > 8))
     {
         assert(t);
         ty1 = t.Tty;
