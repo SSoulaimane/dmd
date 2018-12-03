@@ -3885,6 +3885,7 @@ static if (0)
 
     reg_t reg1, reg2;
     retregs = allocretregs(e.Ety, e.ET, tym1, &reg1, &reg2);
+    assert(retregs || !*pretregs);
 
     if (!usefuncarg)
     {
@@ -3964,20 +3965,6 @@ static if (0)
             cdb.gen2(0xDD, modregrm(3, 3, 0));           // FPOP
             cdb.gen2(0xDD, modregrm(3, 3, 0));           // FPOP
         }
-    }
-    // hack for stack returns
-    else if (!retregs && *pretregs & mST0)
-    {
-        assert(stackused == 0);
-        push87(cdb);
-        return;
-    }
-    else if (!retregs && *pretregs & mST01)
-    {
-        assert(stackused == 0);
-        push87(cdb);
-        push87(cdb);
-        return;
     }
 
     /* Special handling for functions that return one part
