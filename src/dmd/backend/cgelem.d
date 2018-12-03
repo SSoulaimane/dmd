@@ -3322,6 +3322,8 @@ elem * elstruct(elem *e, goal_t goal)
                     else
                         tym = TYucent;
                 }
+                else if (I32 && targ1 && targ2)
+                    tym = TYllong;
                 assert(tym != TYstruct);
             }
             assert(tym != ~0);

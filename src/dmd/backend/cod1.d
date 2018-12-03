@@ -3080,18 +3080,18 @@ void argtypes(type *t, type **arg1type, type **arg2type)
     if (tybasic(ty) == TYarray)
     {
         size_t sz = cast(size_t) type_size(t);
-        if (sz > 0 && sz <= 16)
+        if (sz > 0 && sz <= 2 * REGSIZE)
         {
             type **argtype = arg1type;
-            size_t argsz = sz < 8 ? sz : 8;
-            foreach (v; 0 .. (sz > 8) + 1)
+            size_t argsz = sz < REGSIZE ? sz : REGSIZE;
+            foreach (v; 0 .. (sz > REGSIZE) + 1)
             {
                 *argtype = argsz == 1 ? tstypes[TYchar]
                          : argsz == 2 ? tstypes[TYshort]
                          : argsz <= 4 ? tstypes[TYlong]
                          : tstypes[TYllong];
                 argtype = arg2type;
-                argsz = sz - 8;
+                argsz = sz - REGSIZE;
             }
         }
 
