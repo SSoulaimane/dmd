@@ -3238,7 +3238,7 @@ elem * elstruct(elem *e, goal_t goal)
         targ2 = t.Ttag.Sstruct.Sarg2type;
     }
 
-    if (ty == TYarray)
+    if (sz && ty == TYarray)
     {
         argtypes(t, &targ1, &targ2);
         if (!targ1)
