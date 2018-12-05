@@ -1349,7 +1349,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case TYcdouble:
-            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+            if (tybasic(tyf) == TYjfunc && I32)
                 break;
             if (!I64 || config.exe == EX_WIN64)
                 return 0;
@@ -1357,7 +1357,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case TYcfloat:
-            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+            if (tybasic(tyf) == TYjfunc && I32)
                 break;
             if (!I64)
                 goto case TYllong;
@@ -1368,7 +1368,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
             break;
 
         case TYcldouble:
-            if (tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+            if (tybasic(tyf) == TYjfunc && I32)
                 break;
             if (!I64 || config.exe == EX_WIN64)
                 return 0;
@@ -1474,7 +1474,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
         case 8:
             if (tycomplex(tym))
             {
-                assert(tybasic(tyf) == TYjfunc && config.exe == EX_WIN32);
+                assert(tybasic(tyf) == TYjfunc && I32);
                 *reg = ST01;
                 break;
             }
@@ -1492,7 +1492,7 @@ regm_t allocretregs(tym_t ty, type *t, tym_t tyf, reg_t *reg1, reg_t *reg2)
                 *reg = ST01;
                 break;
             }
-            else if (tycomplex(tym) && tybasic(tyf) == TYjfunc && config.exe == EX_WIN32)
+            else if (tycomplex(tym) && tybasic(tyf) == TYjfunc && I32)
             {
                 *reg = ST01;
                 break;

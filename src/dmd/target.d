@@ -647,7 +647,7 @@ struct Target
         if (tns.ty == Tstruct)
         {
             StructDeclaration sd = (cast(TypeStruct)tns).sym;
-            if (global.params.isLinux && !global.params.is64bit)
+            if (global.params.isLinux && tf.linkage != LINK.d && !global.params.is64bit)
             {
                 //printf("  2 true\n");
                 return true;            // 32 bit C/C++ structs always on stack
@@ -693,6 +693,7 @@ struct Target
         else if ((global.params.isLinux || global.params.isOSX ||
                   global.params.isFreeBSD || global.params.isSolaris ||
                   global.params.isDragonFlyBSD) &&
+                 tf.linkage == LINK.c &&
                  tns.iscomplex())
         {
             if (tns.ty == Tcomplex32)
