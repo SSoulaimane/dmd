@@ -2136,6 +2136,7 @@ elem *el_convfloat(elem *e)
 
     go.changes++;
     tym_t ty = e.Ety;
+    type *t = e.ET;
     int sz = tysize(ty);
     assert(sz <= buffer.length);
     void *p;
@@ -2199,6 +2200,7 @@ printf("\n");
     el_free(e);
     e = el_var(s);
     e.Ety = ty;
+    e.ET = t;
     if (e.Eoper == OPvar)
         e.Ety |= mTYconst;
     //printf("s: %s %d:x%x\n", s.Sident, s.Sseg, s.Soffset);
@@ -2224,6 +2226,7 @@ static if (0)
 
     go.changes++;
     tym_t ty = e.Ety;
+    type *t = e.ET;
     int sz = tysize(ty);
     assert(sz <= buffer.length);
     void *p = &e.EV;
@@ -2239,6 +2242,7 @@ printf("\n");
     el_free(e);
     e = el_var(s);
     e.Ety = ty;
+    e.ET = t;
     if (e.Eoper == OPvar)
         e.Ety |= mTYconst;
     //printf("s: %s %d:x%x\n", s.Sident, s.Sseg, s.Soffset);
@@ -2324,6 +2328,7 @@ L1:
     // Refer e to the symbol generated
     elem *ex = el_ptr(s);
     ex.Ety = e.Ety;
+    ex.ET = e.ET;
     if (e.EV.Voffset)
     {
         if (ex.Eoper == OPrelconst)
