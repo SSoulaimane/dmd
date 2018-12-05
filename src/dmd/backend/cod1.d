@@ -2927,8 +2927,8 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
     ++fpr.i;
 
     // If struct or just wraps another type
-    if (t && tybasic(t.Tty) == TYstruct
-        && (tybasic(ty) == TYstruct || ty & mTYreplaced))
+    if (t && tyaggregate(t.Tty)
+        && (tyaggregate(ty) || ty & mTYreplaced))
     {
         if (config.exe == EX_WIN64)
         {
@@ -2940,8 +2940,20 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
         }
         else
         {
-            type* targ1 = t.Ttag.Sstruct.Sarg1type;
-            type* targ2 = t.Ttag.Sstruct.Sarg2type;
+            type* targ1, targ2;
+            if (tybasic(t.Tty) == TYstruct)
+            {
+                targ1 = t.Ttag.Sstruct.Sarg1type;
+                targ2 = t.Ttag.Sstruct.Sarg2type;
+            }
+            else if (tybasic(t.Tty) == TYarray)
+            {
+                if (I64)
+                    argtypes(t, &targ1, &targ2);
+            }
+            else
+                assert(0);
+
             if (targ1)
             {
                 t = targ1;
@@ -2954,26 +2966,6 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
             }
             else if (I64 && !targ2)
                 return 0;
-        }
-    }
-
-    if (config.exe == EX_WIN64)
-    {
-        // see type_jparam2()
-    }
-    else if (I64 && tybasic(ty) == TYarray)
-    {
-        type* targ1, targ2;
-        argtypes(t, &targ1, &targ2);
-        if (targ1)
-        {
-            t = targ1;
-            ty = t.Tty;
-            if (targ2)
-            {
-                t2 = targ2;
-                ty2 = t2.Tty;
-            }
         }
     }
 
