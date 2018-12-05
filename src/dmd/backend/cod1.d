@@ -2882,6 +2882,12 @@ FuncParamRegs FuncParamRegs_create(tym_t tyf)
 
 private int type_jparam2(type* t, tym_t ty)
 {
+    if (ty & mTYreplaced)
+    {
+        assert(t);
+        ty = t.Tty;
+    }
+
     ty = tybasic(ty);
 
     if (tyfloating(ty))
