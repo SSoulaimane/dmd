@@ -2879,16 +2879,16 @@ void genmovreg(ref CodeBuilder cdb, uint to, uint from, tym_t tym)
 
             case _X(AX, XMM0):               // MOVD/Q to,from
                 genregs(cdb, STOD, from-XMM0, to);
-                checkSetVex(cdb.last(), tym);
                 if (I64 && tysize(tym) >= 8)
                     code_orrex(cdb.last(), REX_W);
+                checkSetVex(cdb.last(), tym);
                 break;
 
             case _X(XMM0, AX):               // MOVD/Q to,from
                 genregs(cdb, LODD, to-XMM0, from);
-                checkSetVex(cdb.last(), tym);
                 if (I64 && tysize(tym) >= 8)
                     code_orrex(cdb.last(),  REX_W);
+                checkSetVex(cdb.last(), tym);
                 break;
 
             case _X(ES, AX):
