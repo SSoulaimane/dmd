@@ -3063,6 +3063,12 @@ void argtypes(type *t, type **arg1type, type **arg2type)
         if (sz == 0)
             return;
 
+        if ((I32 || config.exe == EX_WIN64) && (sz & (sz - 1)))  // power of 2
+            return;
+
+        if (config.exe == EX_WIN64 && sz > REGSIZE)
+            return;
+
         if (sz <= 2 * REGSIZE)
         {
             type **argtype = arg1type;
