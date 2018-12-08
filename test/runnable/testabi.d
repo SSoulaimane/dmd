@@ -1,4 +1,4 @@
-// PERMUTE_ARGS: -release -g
+// PERMUTE_ARGS: -release -g -mcpu=native
 
 import core.simd;
 
@@ -10,8 +10,7 @@ else version(X86_64)
 
 version (D_AVX)
 {
-        /* uncomment to enable AVX tests */
-        //version = Run_AVX_Tests;
+        version = Run_AVX_Tests;
 }
 
 extern (C) int printf(const char*, ...);
@@ -311,14 +310,15 @@ void test1_call_out_vec(T)( int n )
         foreach( i, ref e; t1.tupleof ) e = i+1;
         T t2 = test1_out!(T)();
 
+        results_1[n] = 1;
         foreach( i, ref e; t1.tupleof )
         {
                 import std.traits : isSIMDVector;
 
                 static if (isSIMDVector!(typeof(e)))
-                        results_1[n] |= e[] == t2.tupleof[i][];
+                        results_1[n] &= e[] == t2.tupleof[i][];
                 else
-                        results_1[n] |= e == t2.tupleof[i];
+                        results_1[n] &= e == t2.tupleof[i];
         }
 }
 void test1_call_inout_vec(T)( int n )
@@ -328,15 +328,15 @@ void test1_call_inout_vec(T)( int n )
         T t2 = test1_inout!(T)( t1 );
         foreach( i, ref e; t1.tupleof ) e += 10;
 
-        bool r;
+        bool r = true;
         foreach( i, ref e; t1.tupleof )
         {
                 import std.traits : isSIMDVector;
 
                 static if (isSIMDVector!(typeof(e)))
-                        r |= e[] == t2.tupleof[i][];
+                        r &= e[] == t2.tupleof[i][];
                 else
-                        r |= e == t2.tupleof[i];
+                        r &= e == t2.tupleof[i];
         }
         if( r ) results_1[n] |= 2;
 }
@@ -801,9 +801,9 @@ string gen_reg_capture( int n, string registers )( )
                 break;
                 case 5: code ~= "fstp real ptr [dump];\n";
                 break;
-                case 6: code ~= "movdqa [dump], XMM0;\n";
+                case 6: code ~= "movdqu [dump], XMM0;\n";
                 break;
-                case 7: code ~= "vmovdqa [dump], YMM0;\n";
+                case 7: code ~= "vmovdqu [dump], YMM0;\n";
         }
 
         if( RegValue[n].length >= 2 )
