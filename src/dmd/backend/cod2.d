@@ -3064,7 +3064,8 @@ void cdind(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
         if (retregs & XMMREGS)
         {
             assert(sz == 4 || sz == 8 || sz == 16 || sz == 32); // float, double or vector
-            cs.Iop = xmmload(tym);
+            bool aligned = false;   // can't assume anything
+            cs.Iop = xmmload(tym,aligned);
             cs.Irex &= ~REX_W;
             code_newreg(&cs,reg - XMM0);
             checkSetVex(&cs,tym);

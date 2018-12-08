@@ -4045,7 +4045,10 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, regm_t* n
                     shadowregm |= mask(preg);
                     int op = 0x89;                  // MOV x[EBP],preg
                     if (XMM0 <= preg && preg <= XMM15)
-                        op = xmmstore(t.Tty);
+                    {
+                        bool aligned = 0 == (STACKALIGN & (tyalignsize(t.Tty) - 1));
+                        op = xmmstore(t.Tty, aligned);
+                    }
                     if (!(pushalloc && preg == pushallocreg) || s.Sclass == SCshadowreg)
                     {
                         if (hasframe)
