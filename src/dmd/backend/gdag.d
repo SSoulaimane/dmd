@@ -197,6 +197,7 @@ private void aewalk(elem **pn,vec_t ae)
                     cse_float(n)
                     )
                 {
+                    if (!e.ET) e.ET = n.ET;
                     *pn = e;                // replace n with e
                     //printf("cse: %p (",n); WReqn(*pn); printf(")\n");
                     e.Ecount++;

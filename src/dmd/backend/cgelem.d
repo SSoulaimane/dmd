@@ -3690,10 +3690,11 @@ static if (0)
             tym_t ty = (REGSIZE == 8) ? TYllong : TYint;
             if (tyfloating(e1.Ety) && REGSIZE >= 4)
                 ty = (REGSIZE == 8) ? TYdouble : TYfloat;
-            ty |= e1.Ety & ~mTYbasic;
+            ty |= e1.Ety & ~mTYbasic & ~mTYreplaced;
             e2.Ety = ty;
             e.Ety = ty;
             e1.Ety = ty;
+            e.ET = e1.ET = e2.ET = null;
             elem *eb = el_copytree(e1);
             eb.EV.Voffset += REGSIZE;
 
@@ -3726,10 +3727,11 @@ static if (0)
            )
         {
             tym_t ty = (REGSIZE == 8) ? TYllong : TYint;
-            ty |= e1.Ety & ~mTYbasic;
+            ty |= e1.Ety & ~mTYbasic & ~mTYreplaced;
             e2.Ety = ty;
             e.Ety = ty;
             e1.Ety = ty;
+            e.ET = e1.ET = e2.ET = null;
 
             elem *eb = el_copytree(e);
             eb.EV.E1.EV.Voffset += REGSIZE;
