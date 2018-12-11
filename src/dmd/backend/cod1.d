@@ -2911,7 +2911,7 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, bool vararg, r
     if (t && tyaggregate(t.Tty)
         && (tyaggregate(ty) || ty & mTYreplaced))
     {
-        if (config.exe == EX_WIN64)
+        if (config.exe == EX_WIN64 && tybasic(t.Tty) == TYstruct)
         {
             /* Structs occupy a general purpose register, regardless of the struct
              * size or the number & types of its fields.

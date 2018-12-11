@@ -3243,6 +3243,7 @@ elem * elstruct(elem *e, goal_t goal)
         argtypes(t, &targ1, &targ2);
         if (!targ1)
             goto Ldefault;
+        tym = targ1.Tty;
         goto L1;
     }
 
