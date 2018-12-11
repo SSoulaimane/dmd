@@ -90,7 +90,8 @@ void* mem_malloc2(uint);
 bool ISREF(Declaration var)
 {
     return (config.exe == EX_WIN64 && var.isParameter() &&
-            (var.type.size(Loc.initial) > REGSIZE || var.storage_class & STC.lazy_))
+            (var.type.size(Loc.initial) > REGSIZE || var.storage_class & STC.lazy_
+                || var.type.size() & (var.type.size() - 1)))
             || var.isOut() || var.isRef();
 }
 
@@ -99,7 +100,8 @@ bool ISREF(Declaration var)
 bool ISWIN64REF(Declaration var)
 {
     return (config.exe == EX_WIN64 && var.isParameter() &&
-            (var.type.size(Loc.initial) > REGSIZE || var.storage_class & STC.lazy_))
+            (var.type.size(Loc.initial) > REGSIZE || var.storage_class & STC.lazy_
+                || var.type.size() & (var.type.size() - 1)))
             && !(var.isOut() || var.isRef());
 }
 
@@ -221,7 +223,10 @@ private elem *callfunc(const ref Loc loc,
                 continue;
             }
 
-            if (config.exe == EX_WIN64 && arg.type.size(arg.loc) > REGSIZE && op == NotIntrinsic)
+            const argsz = arg.type.size(arg.loc);
+            if (config.exe == EX_WIN64
+                && (argsz > REGSIZE || (argsz & (argsz - 1)))
+                && op == NotIntrinsic)
             {
                 /* Copy to a temporary, and make the argument a pointer
                  * to that temporary.
