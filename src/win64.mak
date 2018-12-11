@@ -7,7 +7,7 @@
 MAKE=make
 HOST_DC=dmd
 MODEL=64
-BUILD=release
+BUILD=debug
 OS=windows
 
 ################################### Rules ####################################
