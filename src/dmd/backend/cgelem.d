@@ -3238,7 +3238,7 @@ elem * elstruct(elem *e, goal_t goal)
         targ2 = t.Ttag.Sstruct.Sarg2type;
     }
 
-    if (sz && ty == TYarray)
+    if (sz && ty == TYarray && config.exe != EX_WIN64)
     {
         argtypes(t, &targ1, &targ2);
         if (!targ1)
@@ -3262,7 +3262,7 @@ elem * elstruct(elem *e, goal_t goal)
         case 6:
         case 7:  tym = TYllong;
         L2:
-            if (I64 && config.exe != EX_WIN64)
+            if (I64)
             {
                 goto L1;
             }
@@ -3282,14 +3282,14 @@ elem * elstruct(elem *e, goal_t goal)
         case 13:
         case 14:
         case 15:  tym = TYucent;
-            if (I64 && config.exe != EX_WIN64)
+            if (I64)
             {
                 goto L1;
             }
             goto Ldefault;
 
         case 16:
-            if (I64 && config.exe != EX_WIN64)
+            if (I64)
             {   tym = TYucent;
                 goto L1;
             }
