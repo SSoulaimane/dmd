@@ -8,7 +8,7 @@ else version(X86_64)
         version = Run_X86_64_Tests;
 }
 
-version (D_AVX)
+version (D_AVX2)
 {
         version = Run_AVX_Tests;
 }
