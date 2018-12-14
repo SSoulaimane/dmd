@@ -1095,13 +1095,8 @@ static if (NTEXCEPTIONS)
         case BCretexp:
             reg_t reg1, reg2, lreg, mreg;
             reg1 = reg2 = NOREG;
-            if (config.exe == EX_WIN64) // broken
-                retregs = regmask(e.Ety, funcsym_p.ty());
-            else
-            {
-                retregs = allocretregs(e.Ety, e.ET, funcsym_p.ty(), &reg1, &reg2);
-                assert(reg1 != NOREG || !retregs);
-            }
+            retregs = allocretregs(e.Ety, e.ET, funcsym_p.ty(), &reg1, &reg2);
+            assert(reg1 != NOREG || !retregs);
 
             lreg = mreg = NOREG;
             if (reg1 == NOREG)
