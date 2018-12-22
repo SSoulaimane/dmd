@@ -496,7 +496,7 @@ void xmmopass(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
         if (!retregs)
             retregs = XMMREGS & ~rretregs;
         allocreg(cdb,&retregs,&reg,ty1);
-        cs.Iop = xmmload(ty1, true);            // MOVSD xmm,xmm_m64
+        cs.Iop = xmmload(ty1, xmmIsAligned(e1));            // MOVSD xmm,xmm_m64
         code_newreg(&cs,reg - XMM0);
         cdb.gen(&cs);
         checkSetVex(cdb.last(), ty1);
@@ -508,7 +508,7 @@ void xmmopass(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
 
     if (!regvar)
     {
-        cs.Iop = xmmstore(ty1,true);      // reverse operand order of MOVS[SD]
+        cs.Iop = xmmstore(ty1,xmmIsAligned(e1));      // reverse operand order of MOVS[SD]
         cdb.gen(&cs);
         checkSetVex(cdb.last(), ty1);
     }
@@ -557,6 +557,7 @@ void xmmpost(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
     }
 
     code cs;
+    bool aligned = xmmIsAligned(e1);
     if (!regvar)
     {
         getlvalue(cdb,&cs,e1,0);                // get EA
@@ -564,7 +565,7 @@ void xmmpost(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
         if (!retregs)
             retregs = XMMREGS;
         allocreg(cdb,&retregs,&reg,ty1);
-        cs.Iop = xmmload(ty1, true);            // MOVSD xmm,xmm_m64
+        cs.Iop = xmmload(ty1, aligned);            // MOVSD xmm,xmm_m64
         code_newreg(&cs,reg - XMM0);
         cdb.gen(&cs);
         checkSetVex(cdb.last(), ty1);
@@ -577,7 +578,7 @@ void xmmpost(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
     uint resultreg;
     allocreg(cdb,&resultregs, &resultreg, ty1);
 
-    cdb.gen2(xmmload(ty1,true),modregxrmx(3,resultreg-XMM0,reg-XMM0));   // MOVSS/D resultreg,reg
+    cdb.gen2(xmmload(ty1,aligned),modregxrmx(3,resultreg-XMM0,reg-XMM0));   // MOVSS/D resultreg,reg
     checkSetVex(cdb.last(), ty1);
 
     regm_t rretregs = XMMREGS & ~(*pretregs | retregs | resultregs);
@@ -592,7 +593,7 @@ void xmmpost(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
 
     if (!regvar)
     {
-        cs.Iop = xmmstore(ty1,true);      // reverse operand order of MOVS[SD]
+        cs.Iop = xmmstore(ty1,aligned);      // reverse operand order of MOVS[SD]
         cdb.gen(&cs);
         checkSetVex(cdb.last(), ty1);
     }
@@ -1564,6 +1565,8 @@ static if (0)
 
 bool xmmIsAligned(elem *e)
 {
+    while (e.Eoper == OPcomma)
+        e = e.EV.E2;
     if (tyvector(e.Ety) && e.Eoper == OPvar)
     {
         Symbol *s = e.EV.Vsym;
@@ -1572,6 +1575,11 @@ bool xmmIsAligned(elem *e)
             tysize(e.Ety) > STACKALIGN
            )
             return false;       // definitely not aligned
+    }
+    else if (e.Eoper == OPind)
+    {
+        // can't know for sure until runtime
+        return false;   // assume not aligned
     }
     return true;        // assume aligned
 }

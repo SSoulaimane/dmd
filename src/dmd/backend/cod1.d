@@ -1836,10 +1836,10 @@ void fixresult(ref CodeBuilder cdb, elem *e, regm_t retregs, regm_t *pretregs)
             {
                 reg = findreg(retregs & XMMREGS);
                 // MOVSD floatreg, XMM?
-                cdb.genxmmreg(xmmstore(tym), reg, 0, tym);
+                cdb.genxmmreg(xmmstore(tym, false), reg, 0, tym);
                 if (mask(rreg) & XMMREGS)
                     // MOVSD XMM?, floatreg
-                    cdb.genxmmreg(xmmload(tym), rreg, 0, tym);
+                    cdb.genxmmreg(xmmload(tym, false), rreg, 0, tym);
                 else
                 {
                     // MOV rreg,floatreg
@@ -4178,7 +4178,8 @@ private void movParams(ref CodeBuilder cdb, elem* e, uint stackalign, uint funca
     {
         retregs = XMMREGS;
         codelem(cdb, e, &retregs, false);
-        uint op = xmmstore(tym);
+        bool aligned = 0 == (STACKALIGN & (tyalignsize(tym) - 1));
+        uint op = xmmstore(tym, aligned);
         uint r = findreg(retregs);
         cdb.genc1(op, modregxrm(2, r - XMM0, BPRM), FLfuncarg, funcargtos - 16);   // MOV funcarg[EBP],r
         checkSetVex(cdb.last(),tym);
@@ -4809,7 +4810,8 @@ void pushParams(ref CodeBuilder cdb, elem* e, uint stackalign, tym_t tyf)
         stackpush += sz;
         cdb.genadjesp(cast(int)sz);
         cod3_stackadj(cdb, cast(int)sz);
-        uint op = xmmstore(tym);
+        bool aligned = 0 == (STACKALIGN & (tyalignsize(tym) - 1));
+        uint op = xmmstore(tym, aligned);
         uint r = findreg(retxmm);
         cdb.gen2sib(op, modregxrm(0, r - XMM0,4 ), modregrm(0, 4, SP));   // MOV [ESP],r
         checkSetVex(cdb.last(),tym);
