@@ -3388,6 +3388,7 @@ elem * elstruct(elem *e, goal_t goal)
                 assert(tym != TYstruct);
             }
             assert(tym != ~0);
+            tym |= mTYreplaced;
             switch (e.Eoper)
             {   case OPstreq:
                     e.Eoper = OPeq;

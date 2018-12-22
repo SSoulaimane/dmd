@@ -183,6 +183,7 @@ enum
     mTYshared       = 0x00100000,    // shared data
     mTYnothrow      = 0x00200000,    // nothrow function
 
+    mTYreplaced     = 0x01000000,    // scalar replacement for aggregate
     // Used only by C/C++ compiler
 //#if TARGET_LINUX || TARGET_OSX || TARGET_FREEBSD || TARGET_OPENBSD || TARGET_DRAGONFLYBSD || TARGET_SOLARIS
     mTYnoret        = 0x01000000,    // function has no return

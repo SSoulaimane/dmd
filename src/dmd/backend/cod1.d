@@ -2929,6 +2929,12 @@ FuncParamRegs FuncParamRegs_create(tym_t tyf)
 
 private int type_jparam2(type* t, tym_t ty)
 {
+    if (ty & mTYreplaced)
+    {
+        assert(t);
+        ty = t.Tty;
+    }
+
     ty = tybasic(ty);
 
     if (tyfloating(ty))
@@ -2971,8 +2977,9 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, reg_t* preg1, 
 
     ++fpr.i;
 
-    // If struct just wraps another type
-    if (tyb == TYstruct && tybasic(t.Tty) == TYstruct)
+    // If struct or just wraps another type
+    if (t && tybasic(t.Tty) == TYstruct
+        && (tybasic(ty) == TYstruct || ty & mTYreplaced))
     {
         if (config.exe == EX_WIN64)
         {
@@ -3399,10 +3406,12 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
 
                 tym_t ty1 = tybasic(ep.Ety);
                 tym_t ty2 = ty1;
-                if (ty1 == TYstruct)
+                type *t = ep.ET;
+                if (t && tybasic(t.Tty) == TYstruct
+                    && (ty1 == TYstruct || ep.Ety & mTYreplaced))
                 {
-                    type* targ1 = ep.ET.Ttag.Sstruct.Sarg1type;
-                    type* targ2 = ep.ET.Ttag.Sstruct.Sarg2type;
+                    type* targ1 = t.Ttag.Sstruct.Sarg1type;
+                    type* targ2 = t.Ttag.Sstruct.Sarg2type;
                     if (targ1)
                         ty1 = targ1.Tty;
                     if (targ2)
