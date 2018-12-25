@@ -1836,10 +1836,11 @@ void fixresult(ref CodeBuilder cdb, elem *e, regm_t retregs, regm_t *pretregs)
             {
                 reg = findreg(retregs & XMMREGS);
                 // MOVSD floatreg, XMM?
-                cdb.genxmmreg(xmmstore(tym, false), reg, 0, tym);
+                bool aligned = 0 == (STACKALIGN & (tyalignsize(tym) - 1));
+                cdb.genxmmreg(xmmstore(tym, aligned), reg, 0, tym);
                 if (mask(rreg) & XMMREGS)
                     // MOVSD XMM?, floatreg
-                    cdb.genxmmreg(xmmload(tym, false), rreg, 0, tym);
+                    cdb.genxmmreg(xmmload(tym, aligned), rreg, 0, tym);
                 else
                 {
                     // MOV rreg,floatreg
