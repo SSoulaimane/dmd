@@ -4234,7 +4234,19 @@ elem *toElem(Expression e, IRState *irs)
             if (fty == Tvector && tty == Tsarray)
             {
                 if (tfrom.size() == t.size())
+                {
+                    elem *e2 = e;
+                    while (e2.Eoper == OPcomma)
+                        e2 = e2.EV.E2;
+                    if (e2.Eoper != OPvar && e2.Eoper != OPind)
+                    {
+                        // can't perform array ops on it unless it's in memory
+                        e = exp2_copytotemp(e);
+                        e.Ety = e.EV.E2.Ety = TYarray;
+                        e.ET = e.EV.E2.ET = Type_toCtype(t);
+                    }
                     goto Lret;
+                }
             }
 
             ftym = tybasic(e.Ety);
