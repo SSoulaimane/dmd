@@ -322,7 +322,7 @@ tryagain:
                     break;
 
                 const sz = type_alignsize(s.Stype);
-                if (sz > STACKALIGN && (I64 || config.exe == EX_OSX))
+                if (sz > STACKALIGN && sz >= 16)
                 {
                     STACKALIGN = sz;
                     enforcealign = true;
@@ -1350,7 +1350,7 @@ void stackoffsets(int flags)
                  * but are 4 byte aligned on the OSX 32 stack.
                  */
                 Para.offset = _align(REGSIZE,Para.offset); /* align on word stack boundary */
-                if (alignsize >= 16 && (I64 || config.exe == EX_OSX))
+                if (alignsize >= 16)
                     Para.offset = (Para.offset + (alignsize - 1)) & ~(alignsize - 1);
                 s.Soffset = Para.offset;
                 //printf("%s param offset =  x%lx, alignsize = %d\n",s.Sident,(long)s.Soffset, (int)alignsize);
