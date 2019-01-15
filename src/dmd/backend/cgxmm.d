@@ -659,8 +659,6 @@ void xmmneg(ref CodeBuilder cdb,elem *e,regm_t *pretregs)
 
 uint xmmload(tym_t tym, bool aligned)
 {   uint op;
-    if (tysize(tym) == 32)
-        aligned = false;
     switch (tybasic(tym))
     {
         case TYuint:
