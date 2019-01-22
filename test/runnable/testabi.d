@@ -10,7 +10,7 @@ else version(X86_64)
 
 version (D_AVX2)
 {
-        version = Run_AVX_Tests;
+        //version = Run_AVX_Tests;
 }
 
 extern (C) int printf(const char*, ...);
