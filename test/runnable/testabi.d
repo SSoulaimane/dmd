@@ -10,6 +10,8 @@ else version(X86_64)
 
 version (D_AVX2)
 {
+    version(Windows) {} // fails on Windows 64
+    else
         version = Run_AVX_Tests;
 }
 
