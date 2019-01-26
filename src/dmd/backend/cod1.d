@@ -2897,7 +2897,7 @@ int FuncParamRegs_alloc(ref FuncParamRegs fpr, type* t, tym_t ty, reg_t* preg1, 
     // If struct just wraps another type
     if (tyb == TYstruct && tybasic(t.Tty) == TYstruct)
     {
-        if (config.exe == EX_WIN64)
+        if (config.exe == EX_WIN64 || (I64 && t.Ttag.Sstruct.Sflags & STRnotpod))
         {
             /* Structs occupy a general purpose register, regardless of the struct
              * size or the number & types of its fields.
