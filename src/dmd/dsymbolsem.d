@@ -3043,13 +3043,15 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
 
             if (funcdecl.isCtorDeclaration())
             {
+                auto ad2 = funcdecl.isThis2();
+                assert(ad2);
                 sc.flags |= SCOPE.ctor;
-                Type tret = ad.handleType();
+                Type tret = ad2.handleType();
                 assert(tret);
                 tret = tret.addStorageClass(funcdecl.storage_class | sc.stc);
                 tret = tret.addMod(funcdecl.type.mod);
                 tf.next = tret;
-                if (ad.isStructDeclaration())
+                if (ad2.isStructDeclaration())
                     sc.stc |= STC.ref_;
             }
 
@@ -3706,6 +3708,8 @@ private extern(C++) final class DsymbolSemanticVisitor : Visitor
         ctd.parent = sc.parent;
         Dsymbol p = ctd.toParent2();
         AggregateDeclaration ad = p.isAggregateDeclaration();
+        if (!ad)
+            ad = ctd.isThis2();
         if (!ad)
         {
             error(ctd.loc, "constructor can only be a member of aggregate, not %s `%s`", p.kind(), p.toChars());

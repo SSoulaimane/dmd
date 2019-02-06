@@ -1704,7 +1704,7 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
             fd.functionSemantic3();
         }
     }
-    const isCtorCall = fd && fd.needThis() && fd.isCtorDeclaration();
+    auto isCtorCall = fd && fd.needThis() && fd.isCtorDeclaration();
 
     const size_t n = (nargs > nparams) ? nargs : nparams; // n = max(nargs, nparams)
 
@@ -2275,6 +2275,17 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
     }
 
     Type tret = tf.next;
+
+    if (!isCtorCall && fd && fd.isCtorDeclaration())
+    {
+        auto ad2 = fd.isThis2();
+        if (ad2)
+        {
+            tthis = ad2.type.addMod(fd.type.mod);
+            isCtorCall = true;
+        }
+    }
+
     if (isCtorCall)
     {
         //printf("[%s] fd = %s %s, %d %d %d\n", loc.toChars(), fd.toChars(), fd.type.toChars(),
@@ -4451,7 +4462,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         }
         else if (exp.e1.op == TOK.super_ || exp.e1.op == TOK.this_)
         {
-            auto ad = sc.func ? sc.func.isThis() : null;
+            auto ad = sc.func ? sc.func.isThis2() : null;
             auto cd = ad ? ad.isClassDeclaration() : null;
 
             isSuper = exp.e1.op == TOK.super_;
