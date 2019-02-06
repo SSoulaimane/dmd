@@ -478,7 +478,7 @@ public:
     {
         Dsymbol p;
         if (TemplateInstance ti = s.isTemplateInstance())
-            p = ti.isTemplateMixin() ? ti.parent : ti.tempdecl.parent;
+            p = ti.vthis ? ti.vthis : ti.isTemplateMixin() ? ti.parent : ti.tempdecl.parent;
         else
             p = s.parent;
         if (p)

@@ -1567,6 +1567,11 @@ public:
 
     override void visit(TemplateInstance ti)
     {
+        if (ti.vthis)
+        {
+            buf.writestring(ti.vthis.toChars());
+            buf.writeByte('.');
+        }
         buf.writestring(ti.name.toChars());
         tiargsToBuffer(ti);
 
