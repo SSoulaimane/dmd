@@ -1125,6 +1125,16 @@ private Expression resolvePropertiesX(Scope* sc, Expression e1, Expression e2 = 
     Dsymbol s;
     Objects* tiargs;
     Type tthis;
+    if (e1.op == TOK.comma)
+    {
+        CommaExp ce1 = cast(CommaExp)e1;
+        Expression e2x = resolvePropertiesX(sc, ce1.e2, e2);
+        if (e2x)
+        {
+            ce1.e2 = e2x;
+            ce1.type = e2x.type;
+        }
+    }
     if (e1.op == TOK.dot)
     {
         DotExp de = cast(DotExp)e1;
@@ -3944,6 +3954,18 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             return;
         }
 
+        if (exp.e1.op == TOK.comma)
+        {
+            /* Rewrite (a,b)(args) as (a,(b(args)))
+             */
+            auto ce = cast(CommaExp)exp.e1;
+            exp.e1 = ce.e2;
+            ce.e2 = exp;
+            ce.type = null;
+            result = ce.expressionSemantic(sc);
+            return;
+        }
+
         /* This recognizes:
          *  foo!(tiargs)(funcargs)
          */
@@ -5974,6 +5996,18 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         if (Expression ex = unaSemantic(exp, sc))
         {
             result = ex;
+            return;
+        }
+
+        if (exp.e1.op == TOK.comma)
+        {
+            /* Rewrite &(a,b) as (a,&b)
+             */
+            auto ce = cast(CommaExp)exp.e1;
+            exp.e1 = ce.e2;
+            ce.e2 = exp;
+            ce.type = null;
+            result = ce.expressionSemantic(sc);
             return;
         }
 
