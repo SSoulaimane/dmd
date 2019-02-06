@@ -95,6 +95,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
     Dsymbol enclosing;
 
     VarDeclaration vthis;   // 'this' parameter if this aggregate is nested
+    VarDeclaration vthis2;  // 'this' parameter if this aggregate is a template and is nested
 
     // Special member functions
     FuncDeclarations invs;          // Array of invariants
@@ -658,7 +659,7 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
             return;
 
         // If nested struct, add in hidden 'this' pointer to outer scope
-        auto s = toParent2();
+        auto s = toParent4();
         if (!s)
             return;
         Type t = null;
@@ -710,6 +711,29 @@ extern (C++) abstract class AggregateDeclaration : ScopeDsymbol
 
             if (sizeok == Sizeok.fwd)
                 fields.push(vthis);
+
+            if (s.isClassDeclaration() && s !is toParent2())
+            {
+                /* needs second context pointers
+                */
+
+                t = Type.tvoidptr;
+                vthis2 = new ThisDeclaration(loc, t);
+                //vthis2.storage_class |= STC.ref_;
+
+                // Emulate vthis2.addMember()
+                members.push(vthis2);
+
+                // Emulate vthis2.dsymbolSemantic()
+                vthis2.storage_class |= STC.field;
+                vthis2.parent = this;
+                vthis2.protection = Prot(Prot.Kind.public_);
+                vthis2.alignment = t.alignment();
+                vthis2.semanticRun = PASS.semanticdone;
+
+                if (sizeok == Sizeok.fwd)
+                    fields.push(vthis2);
+            }
         }
     }
 

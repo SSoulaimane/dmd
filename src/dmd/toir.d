@@ -281,10 +281,11 @@ elem *getEthis(const ref Loc loc, IRState *irs, Dsymbol fd)
                 StructDeclaration sd = ad.isStructDeclaration();
                 if (fd == sd)
                     break;
-                if (!ad.isNested() || !ad.vthis)
+                if (!ad.isNested() || !(ad.vthis || ad.vthis2))
                     goto Lnoframe;
 
-                ethis = el_bin(OPadd, TYnptr, ethis, el_long(TYsize_t, ad.vthis.offset));
+                const voffset = ad.vthis2 ? ad.vthis2.offset : ad.vthis.offset;
+                ethis = el_bin(OPadd, TYnptr, ethis, el_long(TYsize_t, voffset));
                 ethis = el_una(OPind, TYnptr, ethis);
             }
             if (fdparent == s.toParent2())
@@ -350,7 +351,8 @@ elem *setEthis(const ref Loc loc, IRState *irs, elem *ey, AggregateDeclaration a
             ethis = el_una(OPaddr, TYnptr, ethis);
     }
 
-    ey = el_bin(OPadd, TYnptr, ey, el_long(TYsize_t, ad.vthis.offset));
+    const voffset = ad.vthis2 ? ad.vthis2.offset : ad.vthis.offset;
+    ey = el_bin(OPadd, TYnptr, ey, el_long(TYsize_t, voffset));
     ey = el_una(OPind, TYnptr, ey);
     ey = el_bin(OPeq, TYnptr, ey, ethis);
     return ey;

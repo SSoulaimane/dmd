@@ -3352,7 +3352,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 /* We need a 'this' pointer for the nested class.
                  * Ensure we have the right one.
                  */
-                Dsymbol s = cd.toParent2();
+                Dsymbol s = cd.toParent4();
 
                 //printf("cd isNested, parent = %s '%s'\n", s.kind(), s.toPrettyChars());
                 if (auto cdn = s.isClassDeclaration())

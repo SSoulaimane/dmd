@@ -1567,11 +1567,13 @@ elem *toElem(Expression e, IRState *irs)
                 /* Things to do:
                  * 1) ex: call allocator
                  * 2) ey: set vthis for nested classes
+                 * 2) ew: set vthis2 for nested classes
                  * 3) ez: call constructor
                  */
 
                 elem *ex = null;
                 elem *ey = null;
+                elem *ew = null;
                 elem *ezprefix = null;
                 elem *ez = null;
 
@@ -1605,6 +1607,9 @@ elem *toElem(Expression e, IRState *irs)
                     {
                         ey = el_same(&ex);
                         ez = el_copytree(ey);
+                        if (cd.vthis2)
+                            ew = el_copytree(ey);
+
                     }
                     else if (ne.member)
                         ez = el_same(&ex);
@@ -1625,6 +1630,8 @@ elem *toElem(Expression e, IRState *irs)
                     {
                         ey = el_same(&ex);
                         ez = el_copytree(ey);
+                        if (cd.vthis2)
+                            ew = el_copytree(ey);
                     }
                     else if (ne.member)
                         ez = el_same(&ex);
@@ -1641,7 +1648,7 @@ elem *toElem(Expression e, IRState *irs)
                     //printf("cdthis = %s\n", cdthis.toChars());
                     assert(cd.isNested());
                     int offset = 0;
-                    Dsymbol cdp = cd.toParent2();     // class we're nested in
+                    Dsymbol cdp = cd.toParent4();     // class we're nested in
 
                     //printf("member = %p\n", member);
                     //printf("cdp = %s\n", cdp.toChars());
@@ -1665,6 +1672,16 @@ elem *toElem(Expression e, IRState *irs)
                         ey = el_una(OPind, TYnptr, ey);
                         ey = el_bin(OPeq, TYnptr, ey, ethis);
                     }
+
+                    if (cd.vthis2)
+                    {
+                        /* Initialize cd.vthis2:
+                         *  *(ew + cd.vthis2.offset) = this;
+                         */
+                        assert(ew);
+                        ew = setEthis(ne.loc, irs, ew, cd);
+                    }
+
                     //printf("ex: "); elem_print(ex);
                     //printf("ey: "); elem_print(ey);
                     //printf("ez: "); elem_print(ez);
@@ -1686,6 +1703,7 @@ elem *toElem(Expression e, IRState *irs)
                 }
 
                 e = el_combine(ex, ey);
+                e = el_combine(e, ew);
                 e = el_combine(e, ezprefix);
                 e = el_combine(e, ez);
             }
