@@ -167,6 +167,41 @@ Lno:
     return null; // don't have 'this' available
 }
 
+/*****************************************
+ * Returns the `this` variable for a member or nested function.
+ * If a function has two contexts the member `this` is returned.
+ * Params:
+ *      fd = context
+ * Returns:
+ *      `this` variable if any, otherwise `null`
+ */
+VarDeclaration getVThis(FuncDeclaration fd)
+{
+    if (!fd)
+        return null;
+    if (fd.isThis)
+        return fd.vthis;
+    if (!fd.isNested)
+        return null;
+
+    /* find `this` from enclosing template instance */
+    Dsymbol parent = fd.toParent();
+    while (parent)
+    {
+        auto ti = parent.isTemplateInstance();
+        if (!ti)
+            break;
+        if (ti.vthis)
+            return ti.vthis;
+        auto td = ti.tempdecl.isTemplateDeclaration();
+        if (!td.isstatic)
+            parent = td.toParent();
+        else
+            parent = parent.toParent();
+    }
+    return fd.vthis;
+}
+
 /***********************************
  * Determine if a `this` is needed to access `d`.
  * Params:

@@ -1577,10 +1577,12 @@ extern (C++) class FuncDeclaration : Declaration
     /****************************************
      * Determine if function is a non-static member function
      * that has an implicit 'this' expression.
+     * `isThis2()` includes non-static template member functions.
      * Returns:
      *  The aggregate it is a member of, or null.
      * Contracts:
-     *  If isThis() returns true, isNested() should return false.
+     *  If isThis()  returns true, isNested() should return false.
+     *  If isThis2() returns true, isNested() may also return true.
      */
     override inout(AggregateDeclaration) isThis() inout
     {
@@ -1588,6 +1590,13 @@ extern (C++) class FuncDeclaration : Declaration
         auto ad = (storage_class & STC.static_) ? objc.isThis(this) : isMember2();
         //printf("-FuncDeclaration::isThis() %p\n", ad);
         return ad;
+    }
+
+    /// ditto
+    final inout(AggregateDeclaration) isThis2() inout
+    {
+        auto ad = isThis();
+        return ad ? ad : isMember4();
     }
 
     override final bool needThis()
