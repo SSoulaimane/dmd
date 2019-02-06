@@ -5934,6 +5934,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
 
     Dsymbol tempdecl;           // referenced by foo.bar.abc
     Dsymbol enclosing;          // if referencing local symbols, this is the context
+    VarDeclaration vthis;       // 'this' parameter (member function)
     Dsymbol aliasdecl;          // !=null if instance is an alias for its sole member
     TemplateInstance inst;      // refer to existing instance
     ScopeDsymbol argsym;        // argument symbol table
@@ -6228,6 +6229,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
         if (!hash)
         {
             hash = cast(size_t)cast(void*)enclosing;
+            hash += cast(size_t)cast(void*)vthis;
             hash += arrayObjectHash(&tdtypes);
             hash += hash == 0;
         }
@@ -7279,7 +7281,7 @@ extern (C++) class TemplateInstance : ScopeDsymbol
                 if ((td && td.literal) || (ti && ti.enclosing) || (d && !d.isDataseg() && !(d.storage_class & STC.manifest) && (!d.isFuncDeclaration() || d.isFuncDeclaration().isNested()) && !isTemplateMixin()))
                 {
                     // if module level template
-                    if (isstatic)
+                    if (1)
                     {
                         Dsymbol dparent = sa.toParent2();
                         if (!dparent)

@@ -148,7 +148,21 @@ FuncDeclaration hasThis(Scope* sc)
                 goto Lno;
             TemplateInstance ti = parent.isTemplateInstance();
             if (ti)
+            {
                 parent = ti.parent;
+                if (!ti.isTemplateMixin())
+                {
+                    while(1)
+                    {
+                        if (ti.vthis)
+                            return fd;
+                        Dsymbol tdp = ti.tempdecl.toParent();
+                        ti = tdp ? tdp.isTemplateInstance() : null;
+                        if (!ti)
+                            break;
+                    }
+                }
+            }
             else
                 break;
         }
@@ -2158,6 +2172,7 @@ extern (C++) final class DsymbolExp : Expression
 extern (C++) class ThisExp : Expression
 {
     VarDeclaration var;
+    bool directaccess;          // access directly outer context
 
     extern (D) this(const ref Loc loc)
     {

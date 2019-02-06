@@ -1346,6 +1346,13 @@ elem *toElem(Expression e, IRState *irs)
             assert(irs.sthis);
 
             elem *ethis;
+            if (te.directaccess)
+            {
+                assert(te.var);
+                result = toElem(new VarExp(te.loc, te.var), irs);
+                return;
+            }
+
             if (te.var)
             {
                 assert(te.var.parent);

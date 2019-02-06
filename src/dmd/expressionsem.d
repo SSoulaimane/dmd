@@ -996,7 +996,8 @@ Lagain:
         Dsymbol p = td.toParent2();
         FuncDeclaration fdthis = hasThis(sc);
         AggregateDeclaration ad = p ? p.isAggregateDeclaration() : null;
-        if (fdthis && ad && isAggregate(fdthis.vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
+        VarDeclaration vthis = fdthis ? getVThis(fdthis) : null;
+        if (vthis && ad && isAggregate(vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
         {
             e = new DotTemplateExp(loc, new ThisExp(loc), td);
         }
@@ -1077,11 +1078,12 @@ L1:
                 for (s = tcd.toParent(); s && s.isFuncDeclaration(); s = s.toParent())
                 {
                     FuncDeclaration f = s.isFuncDeclaration();
-                    if (f.vthis)
+                    VarDeclaration vthis = getVThis(f);
+                    if (vthis)
                     {
                         //printf("rewriting e1 to %s's this\n", f.toChars());
                         n++;
-                        e1 = new VarExp(loc, f.vthis);
+                        e1 = new VarExp(loc, vthis);
                     }
                     else
                     {
@@ -2634,9 +2636,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         if (!fd)
             goto Lerr;
 
-        assert(fd.vthis);
-        e.var = fd.vthis;
-        assert(e.var.parent);
+        e.var = getVThis(fd);
+        e.directaccess = e.var != fd.vthis;
+        assert(e.var && e.var.parent);
         e.type = e.var.type;
 
         if (e.var.checkNestedReference(sc, e.loc))
@@ -2697,10 +2699,14 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         if (!fd)
             goto Lerr;
 
-        e.var = fd.vthis;
+        e.var = getVThis(fd);
+        e.directaccess = e.var != fd.vthis;
         assert(e.var && e.var.parent);
 
-        s = fd.toParent();
+        if (e.var != fd.vthis)
+            s = fd.isThis2();
+        else
+            s = fd.toParent();
         while (s && s.isTemplateInstance())
             s = s.toParent();
         if (s.isTemplateDeclaration()) // allow inside template constraint
@@ -3085,8 +3091,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 {
                     Dsymbol p = td.toParent2();
                     FuncDeclaration fdthis = hasThis(sc);
+                    VarDeclaration vthis = fdthis ? getVThis(fdthis) : null;
                     AggregateDeclaration ad = p ? p.isAggregateDeclaration() : null;
-                    if (fdthis && ad && isAggregate(fdthis.vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
+                    if (vthis && ad && isAggregate(vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
                     {
                         Expression e = new DotTemplateInstanceExp(exp.loc, new ThisExp(exp.loc), ti.name, ti.tiargs);
                         result = e.expressionSemantic(sc);
@@ -3096,8 +3103,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 else if (OverloadSet os = ti.tempdecl.isOverloadSet())
                 {
                     FuncDeclaration fdthis = hasThis(sc);
+                    VarDeclaration vthis = fdthis ? getVThis(fdthis) : null;
                     AggregateDeclaration ad = os.parent.isAggregateDeclaration();
-                    if (fdthis && ad && isAggregate(fdthis.vthis.type) == ad)
+                    if (vthis && ad && isAggregate(vthis.type) == ad)
                     {
                         Expression e = new DotTemplateInstanceExp(exp.loc, new ThisExp(exp.loc), ti.name, ti.tiargs);
                         result = e.expressionSemantic(sc);
@@ -11267,6 +11275,27 @@ Expression semanticY(DotTemplateInstanceExp exp, Scope* sc, int flag)
         exp.ti.tempdecl = dte.td;
         if (!exp.ti.semanticTiargs(sc))
             return errorExp();
+
+        auto td = exp.ti.tempdecl.isTemplateDeclaration();
+        if (!exp.ti.isTemplateMixin() && !td.isstatic && td.isMember2() &&
+            exp.ti.hasNestedArgs(exp.ti.tiargs, td.isstatic))
+        {
+            auto e1x = lastComma(exp.e1);
+            if (e1x.op == TOK.variable)
+                exp.ti.vthis = (cast(VarExp)e1x).var.isVarDeclaration();
+            else
+            {
+                VarDeclaration tmp = copyToTemp(0, "__this", exp.e1);
+                tmp.dsymbolSemantic(sc);
+                Expression de = new DeclarationExp(exp.e1.loc, tmp);
+                Expression ve = new VarExp(exp.e1.loc, tmp);
+                Expression ce = Expression.combine(de, ve);
+                ce = ce.expressionSemantic(sc);
+                exp.e1 = ce;
+                exp.ti.vthis = tmp;
+            }
+        }
+
         if (exp.ti.needsTypeInference(sc))
             return exp;
         exp.ti.dsymbolSemantic(sc);
