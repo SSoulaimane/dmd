@@ -129,6 +129,15 @@ class C4
                 {
                     return a + b + c + s + m;
                 }
+                class K
+                {
+                    int n;
+                    this(int i) { n = i; }
+                    auto sum()
+                    {
+                        return a + b + c + s + m + n;
+                    }
+                }
             }
         }
     }
@@ -141,6 +150,7 @@ void test4()
     auto c = 3;
 
     assert(new C4().A!a.B!b.C!c.sum() == 1+2+3+10+20);
+    assert(new C4().new C4.A!a.B!b.C!c.K(30).sum() == 1+2+3+10+20+30);
 }
 
 /********************************************/
@@ -274,6 +284,36 @@ void test8()
 
     ++s.getRef!a().m;
     assert(s.m == 2);
+}
+
+/********************************************/
+
+class C9
+{
+    int m;
+    class D(alias a)
+    {
+        auto sum()
+        {
+            return m + a;
+        }
+        auto get(alias i)() { return this; }
+    }
+}
+
+void test9()
+{
+    int a = 10;
+    auto o = new C9;
+    o.m = 1;
+    assert(o.new C9.D!a().sum() == 10+1);
+
+    // type checking
+    auto o0 = new C9;
+    auto o1 = new C9;
+    static assert(is(o0.D!a == o1.D!a));
+    static assert(is(o0.D!a == C9.D!a));
+    static assert(is(C9.D!a == typeof(o0.D!a.get!a())));
 }
 
 /********************************************/
