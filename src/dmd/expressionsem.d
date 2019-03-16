@@ -1000,7 +1000,7 @@ Lagain:
     }
     if (TemplateDeclaration td = s.isTemplateDeclaration())
     {
-        Dsymbol p = td.toParent2();
+        Dsymbol p = td.toParent4();
         FuncDeclaration fdthis = hasThis(sc);
         AggregateDeclaration ad = p ? p.isAggregateDeclaration() : null;
         if (fdthis && ad && isAggregate(fdthis.vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
@@ -2707,9 +2707,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         e.var = fd.vthis;
         assert(e.var && e.var.parent);
 
-        s = fd.toParent();
-        while (s && s.isTemplateInstance())
-            s = s.toParent();
+        s = fd.toParent4();
         if (s.isTemplateDeclaration()) // allow inside template constraint
             s = s.toParent();
         assert(s);
@@ -3090,7 +3088,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             {
                 if (TemplateDeclaration td = ti.tempdecl.isTemplateDeclaration())
                 {
-                    Dsymbol p = td.toParent2();
+                    Dsymbol p = td.toParent4();
                     FuncDeclaration fdthis = hasThis(sc);
                     AggregateDeclaration ad = p ? p.isAggregateDeclaration() : null;
                     if (fdthis && ad && isAggregate(fdthis.vthis.type) == ad && (td._scope.stc & STC.static_) == 0)
@@ -3340,7 +3338,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 /* We need a 'this' pointer for the nested class.
                  * Ensure we have the right one.
                  */
-                Dsymbol s = cd.toParent2();
+                Dsymbol s = cd.toParent4();
 
                 //printf("cd isNested, parent = %s '%s'\n", s.kind(), s.toPrettyChars());
                 if (auto cdn = s.isClassDeclaration())
@@ -3349,7 +3347,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                     {
                         // Supply an implicit 'this' and try again
                         exp.thisexp = new ThisExp(exp.loc);
-                        for (Dsymbol sp = sc.parent; 1; sp = sp.parent)
+                        for (Dsymbol sp = sc.parent; 1; sp = sp.toParent4())
                         {
                             if (!sp)
                             {
@@ -4358,7 +4356,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             }
             if (exp.f.needThis())
             {
-                AggregateDeclaration ad = exp.f.toParent2().isAggregateDeclaration();
+                AggregateDeclaration ad = exp.f.toParent4().isAggregateDeclaration();
                 ue.e1 = getRightThis(exp.loc, sc, ad, ue.e1, exp.f);
                 if (ue.e1.op == TOK.error)
                 {
@@ -5928,7 +5926,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         e.type = e.type.typeSemantic(e.loc, sc);
 
         FuncDeclaration f = e.func.toAliasFunc();
-        AggregateDeclaration ad = f.toParent().isAggregateDeclaration();
+        AggregateDeclaration ad = f.toParent4().isAggregateDeclaration();
         if (f.needThis())
             e.e1 = getRightThis(e.loc, sc, ad, e.e1, f);
 
