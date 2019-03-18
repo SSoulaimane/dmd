@@ -948,8 +948,9 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
 
     if (fd.vthis)
     {
-        assert(!fd.vthis.csym);
-        sthis = toSymbol(fd.vthis);
+        auto vthis = fd.vthis2 ? fd.vthis2 : fd.vthis;
+        assert(!vthis.csym);
+        sthis = toSymbol(vthis);
         sthis.Stype = getParentClosureType(sthis, fd);
         irs.sthis = sthis;
         if (!(f.Fflags3 & Fnested))
@@ -1146,6 +1147,7 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
             // Adjust the 'this' pointer instead of using a thunk
             assert(irs.sthis);
             elem *ethis = el_var(irs.sthis);
+            ethis = fixEthis2(ethis, fd);
             elem *e = el_bin(OPminass, TYnptr, ethis, el_long(TYsize_t, fd.interfaceVirtual.offset));
             block_appendexp(irs.blx.curblock, e);
         }
@@ -1174,8 +1176,10 @@ void FuncDeclaration_toObjFile(FuncDeclaration fd, bool multiobj)
             {
                 if (b.BC == BCret)
                 {
+                    elem *ethis = el_var(sthis);
+                    ethis = fixEthis2(ethis, fd);
                     b.BC = BCretexp;
-                    b.Belem = el_combine(b.Belem, el_var(sthis));
+                    b.Belem = el_combine(b.Belem, ethis);
                 }
             }
         }

@@ -170,7 +170,8 @@ private elem *callfunc(const ref Loc loc,
         Type t,                 // TypeDelegate or TypeFunction for this function
         elem *ehidden,          // if !=null, this is the 'hidden' argument
         Expressions *arguments,
-        elem *esel = null)      // selector for Objective-C methods (when not provided by fd)
+        elem *esel = null,      // selector for Objective-C methods (when not provided by fd)
+        elem *ethis2 = null)    // multi-context array
 {
     elem *ethis = null;
     elem *eside = null;
@@ -353,6 +354,13 @@ private elem *callfunc(const ref Loc loc,
             {
                 ethis = addressElem(ec, ectype);
             }
+            if (ethis2)
+            {
+                elem *ectx0 = el_una(OPind, ethis.Ety, el_copytree(ethis2));
+                elem *eeq = el_bin(OPeq, ethis.Ety, ectx0, ethis);
+                ethis = el_copytree(ectx0);
+                eside = el_combine(eeq, eside);
+            }
             if (el_sideeffect(ethis))
             {
                 elem *ex = ethis;
@@ -402,10 +410,26 @@ if (!irs.params.is64bit) assert(tysize(TYnptr) == 4);
     else if (fd && fd.isNested())
     {
         assert(!ethis);
-        ethis = getEthis(loc, irs, fd);
+        ethis = getEthis(loc, irs, fd, fd.toParent4());
+        if (ethis2)
+        {
+            elem *ectx0 = el_una(OPind, ethis.Ety, el_copytree(ethis2));
+            elem *eeq = el_bin(OPeq, ethis.Ety, ectx0, ethis);
+            ethis = el_copytree(ectx0);
+            eside = el_combine(eeq, eside);
+        }
     }
 
-    ep = el_param(ep, ethis);
+    if (ethis2)
+    {
+        elem *ethis1 = getEthis(loc, irs, fd, fd.toParent2());
+        elem *ectx1 = el_bin(OPadd, TYnptr, el_copytree(ethis2), el_long(TYsize_t, tysize(TYnptr)));
+        ectx1 = el_una(OPind, TYnptr, ectx1);
+        elem *eeq = el_bin(OPeq, ethis1.Ety, ectx1, ethis1);
+        eside = el_combine(eeq, eside);
+    }
+
+    ep = el_param(ep, ethis2 ? ethis2 : ethis);
     if (ehidden)
         ep = el_param(ep, ehidden);     // if ehidden goes last
 
@@ -1188,7 +1212,7 @@ elem *toElem(Expression e, IRState *irs)
                          */
                         if (fd.vthis)
                         {
-                            Symbol *vs = toSymbol(fd.vthis);
+                            Symbol *vs = toSymbol(fd.vthis2 ? fd.vthis2 : fd.vthis);
                             //printf("vs = %s, offset = %x, %p\n", vs.Sident, (int)vs.Soffset, vs);
                             soffset -= vs.Soffset;
                         }
@@ -1395,9 +1419,13 @@ elem *toElem(Expression e, IRState *irs)
                 FuncDeclaration fd = te.var.toParent2().isFuncDeclaration();
                 assert(fd);
                 ethis = getEthis(te.loc, irs, fd);
+                ethis = fixEthis2(ethis, fd);
             }
             else
+            {
                 ethis = el_var(irs.sthis);
+                ethis = fixEthis2(ethis, irs.getFunc());
+            }
 
             if (te.type.ty == Tstruct)
             {
@@ -3619,22 +3647,45 @@ elem *toElem(Expression e, IRState *irs)
                 }
             }
 
+            elem *eeq = null;
+            elem *ethis2 = null;
             elem *ethis;
             Symbol *sfunc = toSymbol(de.func);
             elem *ep;
-            if (de.func.isNested())
+            if (de.func.isNested() && !de.func.isThis())
             {
                 ep = el_ptr(sfunc);
                 if (de.e1.op == TOK.null_)
                     ethis = toElem(de.e1, irs);
                 else
-                    ethis = getEthis(de.loc, irs, de.func);
+                    ethis = getEthis(de.loc, irs, de.func, de.func.toParent4());
+                if (de.vthis2)
+                {
+                    elem *ectx0 = el_una(OPind, ethis.Ety, el_copytree(ethis2));
+                    elem *eeq1 = el_bin(OPeq, ethis.Ety, ectx0, ethis);
+                    ethis = el_copytree(ectx0);
+                    eeq = el_combine(eeq1, eeq);
+                }
             }
             else
             {
                 ethis = toElem(de.e1, irs);
                 if (de.e1.type.ty != Tclass && de.e1.type.ty != Tpointer)
                     ethis = addressElem(ethis, de.e1.type);
+
+                if (de.vthis2)
+                {
+                    // avoid using toSymbol directly because vthis2 may be a closure var
+                    Expression ve = new VarExp(de.loc, de.vthis2);
+                    ve.type = de.vthis2.type;
+                    ve = new AddrExp(de.loc, ve);
+                    ve.type = de.vthis2.type.pointerTo();
+                    ethis2 = toElem(ve, irs);
+                    elem *ectx0 = el_una(OPind, ethis.Ety, el_copytree(ethis2));
+                    elem *eeq1 = el_bin(OPeq, ethis.Ety, ectx0, ethis);
+                    ethis = el_copytree(ectx0);
+                    eeq = el_combine(eeq1, eeq);
+                }
 
                 if (de.e1.op == TOK.super_ || de.e1.op == TOK.dotType)
                     directcall = 1;
@@ -3667,7 +3718,19 @@ elem *toElem(Expression e, IRState *irs)
                 //if (func.tintro)
                 //    func.error(loc, "cannot form delegate due to covariant return type");
             }
+
+            if (de.vthis2)
+            {
+                elem *ethis1 = getEthis(de.loc, irs, de.func, de.func.toParent2());
+                elem *ectx1 = el_bin(OPadd, TYnptr, el_copytree(ethis2), el_long(TYsize_t, tysize(TYnptr)));
+                ectx1 = el_una(OPind, TYnptr, ectx1);
+                elem *eeq1 = el_bin(OPeq, ethis1.Ety, ectx1, ethis1);
+                eeq = el_combine(eeq1, eeq);
+            }
+
             elem *e;
+            if (ethis2)
+                ethis = ethis2;
             if (ethis.Eoper == OPcomma)
             {
                 ethis.EV.E2 = el_pair(TYdelegate, ethis.EV.E2, ep);
@@ -3677,6 +3740,8 @@ elem *toElem(Expression e, IRState *irs)
             else
                 e = el_pair(TYdelegate, ethis, ep);
             elem_setLoc(e, de.loc);
+            if (eeq)
+                e = el_combine(eeq, e);
             result = e;
         }
 
@@ -3853,7 +3918,17 @@ elem *toElem(Expression e, IRState *irs)
                     }
                 }
             }
-            elem *ecall = callfunc(ce.loc, irs, ce.directcall, ce.type, ec, ectype, fd, t1, ehidden, ce.arguments);
+            elem *ethis2 = null;
+            if (ce.vthis2)
+            {
+                // avoid using toSymbol directly because vthis2 may be a closure var
+                Expression ve = new VarExp(ce.loc, ce.vthis2);
+                ve.type = ce.vthis2.type;
+                ve = new AddrExp(ce.loc, ve);
+                ve.type = ce.vthis2.type.pointerTo();
+                ethis2 = toElem(ve, irs);
+            }
+            elem *ecall = callfunc(ce.loc, irs, ce.directcall, ce.type, ec, ectype, fd, t1, ehidden, ce.arguments, null, ethis2);
 
             if (dctor && ecall.Eoper == OPind)
             {

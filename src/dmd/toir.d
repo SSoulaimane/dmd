@@ -262,6 +262,9 @@ elem *getEthis(const ref Loc loc, IRState *irs, Dsymbol fd, Dsymbol fdp = null)
                  */
                 // Error should have been caught by front end
                 assert(thisfd.isNested() || thisfd.vthis);
+
+                // pick one context
+                ethis = fixEthis2(ethis, thisfd, followInstantiationContext(thisfd, symp));
             }
             else
             {
@@ -314,6 +317,22 @@ elem *getEthis(const ref Loc loc, IRState *irs, Dsymbol fd, Dsymbol fdp = null)
     return ethis;
 }
 
+/************************
+ * Select one context pointer from a dual-context array
+ * Returns:
+ *      *(ethis + offset);
+ */
+elem *fixEthis2(elem *ethis, FuncDeclaration fd, bool ctxt2 = false)
+{
+    if (fd && fd.vthis2)
+    {
+        if (ctxt2)
+            ethis = el_bin(OPadd, TYnptr, ethis, el_long(TYsize_t, tysize(TYnptr)));
+        ethis = el_una(OPind, TYnptr, ethis);
+    }
+    return ethis;
+}
+
 /*************************
  * Initialize the hidden aggregate member, vthis, with
  * the context pointer.
@@ -333,7 +352,7 @@ elem *setEthis(const ref Loc loc, IRState *irs, elem *ey, AggregateDeclaration a
     {
         ethis = getEthis(loc, irs, ad);
     }
-    else if (thisfd.vthis &&
+    else if (thisfd.vthis && !thisfd.vthis2 &&
           (adp == thisfd.toParent2() ||
            (adp.isClassDeclaration() &&
             adp.isClassDeclaration().isBaseOf(thisfd.toParent2().isClassDeclaration(), &offset)
@@ -1135,7 +1154,7 @@ void buildCapture(FuncDeclaration fd)
             /* Add variable as capture type member */
             auto soffset = vsym.Soffset;
             if (fd.vthis)
-                soffset -= toSymbol(fd.vthis).Soffset; // see toElem.ToElemVisitor.visit(SymbolExp)
+                soffset -= toSymbol(fd.vthis2 ? fd.vthis2 : fd.vthis).Soffset; // see toElem.ToElemVisitor.visit(SymbolExp)
             symbol_struct_addField(capturestru.Ttag, &vsym.Sident[0], vsym.Stype, cast(uint)soffset);
             //printf("capture field %s: offset: %i\n", &vsym.Sident[0], v.offset);
         }
