@@ -3976,9 +3976,9 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, int flag)
                     auto fd = p.isFuncDeclaration();
                     if (!fd)
                         break;
-                    if (fd.isNested())
-                        continue;
                     auto ad = fd.isThis();
+                    if (!ad && fd.isNested())
+                        continue;
                     if (!ad)
                         break;
                     if (auto cdp = ad.isClassDeclaration())
@@ -4144,13 +4144,89 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, int flag)
                 /* Rewrite as:
                  *  this.d
                  */
-                if (hasThis(sc))
+                AggregateDeclaration ad = d.isMember4();
+                if (auto f = hasThis(sc))
                 {
                     // This is almost same as getRightThis() in expression.c
-                    Expression e1 = new ThisExp(e.loc);
+                    Expression e1;
+                    Type t;
+                    /* returns: true to continue, false to return */
+                    bool skipNestedFunctions(Dsymbol s)
+                    {
+                        while (s && s.isFuncDeclaration())
+                        {
+                            FuncDeclaration f = s.isFuncDeclaration();
+                            if (f.vthis)
+                            {
+                                if (f.vthis2)
+                                {
+                                    if (f.hasNestedFrameRefs())
+                                    {
+                                        e1 = new DotVarExp(e1.loc, e1, f.vthis2);
+                                        e1.type = f.vthis2.type;
+                                    }
+                                    // (*__this)[i]
+                                    e1 = new PtrExp(e1.loc, e1);
+                                    e1.type = Type.tvoidptr.sarrayOf(2);
+                                    uint i = followInstantiationContext(f, ad);
+                                    e1 = new IndexExp(e1.loc, e1, new IntegerExp(i));
+                                    e1 = e1.expressionSemantic(sc);
+                                    s = toParentP(f, ad);
+                                    continue;
+                                }
+                                else
+                                {
+                                    if (f.hasNestedFrameRefs())
+                                    {
+                                        e1 = new DotVarExp(e1.loc, e1, f.vthis);
+                                        e1.type = f.vthis.type;
+                                    }
+                                }
+                            }
+                            else
+                            {
+                                e1 = e = new VarExp(e.loc, d);
+                                return false;
+                            }
+                            s = s.toParent2();
+                        }
+                        if (s && e1.type.equivalent(Type.tvoidptr))
+                        {
+                            if (auto sad = s.isAggregateDeclaration())
+                            {
+                                Type ta = sad.handleType();
+                                if (ta.ty == Tstruct)
+                                    ta = ta.pointerTo();
+                                ta = ta.addMod(t.mod);
+                                e1 = new CastExp(e1.loc, e1, ta);
+                                e1.type = ta;
+                            }
+                        }
+                        return true;
+                    }
+                    if (f.vthis2)
+                    {
+                        if (followInstantiationContext(f, ad))
+                        {
+                            e1 = new VarExp(e.loc, f.vthis2);
+                            e1 = new PtrExp(e1.loc, e1);
+                            e1 = new IndexExp(e1.loc, e1, IntegerExp.literal!1);
+                            e1 = e1.expressionSemantic(sc);
+                            auto pad = f.toParent2().isAggregateDeclaration();
+                            e1.type = pad ? pad.handleType() : Type.tvoidptr;
+                            e1.type = e1.type.addMod(t.mod);
+                            if (e1.type.ty == Tstruct)
+                                e1.type = e1.type.pointerTo();
+                            t = e1.type.toBasetype();
+                            if (!skipNestedFunctions(f.toParent2()))
+                                return e1;
+                            goto L2;
+                        }
+                    }
+                    e1 = new ThisExp(e.loc);
                     e1 = e1.expressionSemantic(sc);
                 L2:
-                    Type t = e1.type.toBasetype();
+                    t = e1.type.toBasetype();
                     ClassDeclaration cd = e.type.isClassHandle();
                     ClassDeclaration tcd = t.isClassHandle();
                     if (cd && tcd && (tcd == cd || cd.isBaseOf(tcd, null)))
@@ -4165,39 +4241,17 @@ Expression dotExp(Type mt, Scope* sc, Expression e, Identifier ident, int flag)
                         /* e1 is the 'this' pointer for an inner class: tcd.
                          * Rewrite it as the 'this' pointer for the outer class.
                          */
-                        e1 = new DotVarExp(e.loc, e1, tcd.vthis);
-                        e1.type = tcd.vthis.type;
+                        auto vthis = followInstantiationContext(tcd, ad) ? tcd.vthis2 : tcd.vthis;
+                        e1 = new DotVarExp(e.loc, e1, vthis);
+                        e1.type = vthis.type;
                         e1.type = e1.type.addMod(t.mod);
                         // Do not call ensureStaticLinkTo()
                         //e1 = e1.expressionSemantic(sc);
 
                         // Skip up over nested functions, and get the enclosing
                         // class type.
-                        int n = 0;
-                        for (s = tcd.toParent(); s && s.isFuncDeclaration(); s = s.toParent())
-                        {
-                            FuncDeclaration f = s.isFuncDeclaration();
-                            if (f.vthis)
-                            {
-                                //printf("rewriting e1 to %s's this\n", f.toChars());
-                                n++;
-                                e1 = new VarExp(e.loc, f.vthis);
-                            }
-                            else
-                            {
-                                e = new VarExp(e.loc, d);
-                                return e;
-                            }
-                        }
-                        if (s && s.isClassDeclaration())
-                        {
-                            e1.type = s.isClassDeclaration().type;
-                            e1.type = e1.type.addMod(t.mod);
-                            if (n > 1)
-                                e1 = e1.expressionSemantic(sc);
-                        }
-                        else
-                            e1 = e1.expressionSemantic(sc);
+                        if (!skipNestedFunctions(toParentP(tcd, ad)))
+                            return e1;
                         goto L2;
                     }
                 }

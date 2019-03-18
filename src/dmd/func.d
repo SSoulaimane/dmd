@@ -210,6 +210,12 @@ extern (C++) class FuncDeclaration : Declaration
          */
         VarDeclaration vthis;
 
+        /**
+         * The multi-context parameter array holding the 'this' parameter followed
+         * by the frame pointer of the enclosing function.
+         */
+        VarDeclaration vthis2;
+
         /// The selector parameter for Objective-C methods.
         VarDeclaration selectorParameter;
     }
@@ -233,6 +239,7 @@ extern (C++) class FuncDeclaration : Declaration
     // scopes from having the same name
     DsymbolTable localsymtab;
     VarDeclaration vthis;               /// 'this' parameter (member and nested)
+    VarDeclaration vthis2;              /// multi-context parameter
     VarDeclaration v_arguments;         /// '_arguments' parameter
     ObjcSelector* selector;             /// Objective-C method selector (member function only)
     VarDeclaration selectorParameter;   /// Objective-C implicit selector parameter
@@ -460,6 +467,33 @@ extern (C++) class FuncDeclaration : Declaration
      */
     final HiddenParameters declareThis(Scope* sc, AggregateDeclaration ad)
     {
+        VarDeclaration v2 = null;
+        if (toParent2() != toParent4())
+        {
+            Type tthis2 = Type.tvoidptr.sarrayOf(2).pointerTo();
+            tthis2 = tthis2.addMod(type.mod)
+                           .addStorageClass(storage_class);
+            v2 = new VarDeclaration(loc, tthis2, Identifier.idPool("__this"), null);
+            v2.storage_class |= STC.parameter | STC.nodtor;
+            if (type.ty == Tfunction)
+            {
+                TypeFunction tf = cast(TypeFunction)type;
+                if (tf.isreturn)
+                    v2.storage_class |= STC.return_;
+                if (tf.isscope)
+                    v2.storage_class |= STC.scope_;
+                // if member function is marked 'inout', then this is 'return ref'
+                if (tf.iswild & 2)
+                    v2.storage_class |= STC.return_;
+            }
+            if (flags & FUNCFLAG.inferScope && !(v2.storage_class & STC.scope_))
+                v2.storage_class |= STC.maybescope;
+            v2.dsymbolSemantic(sc);
+            if (!sc.insert(v2))
+                assert(0);
+            v2.parent = this;
+            // fallthrough
+        }
         if (ad)
         {
             //printf("declareThis() %s\n", toChars());
@@ -491,7 +525,7 @@ extern (C++) class FuncDeclaration : Declaration
             if (!sc.insert(v))
                 assert(0);
             v.parent = this;
-            return HiddenParameters(v, objc.createSelectorParameter(this, sc));
+            return HiddenParameters(v, v2, objc.createSelectorParameter(this, sc));
         }
         if (isNested())
         {
@@ -516,7 +550,7 @@ extern (C++) class FuncDeclaration : Declaration
             if (!sc.insert(v))
                 assert(0);
             v.parent = this;
-            return HiddenParameters(v);
+            return HiddenParameters(v, v2);
         }
         return HiddenParameters.init;
     }
@@ -1588,7 +1622,8 @@ extern (C++) class FuncDeclaration : Declaration
         //printf("\ttoParent2() = '%s'\n", f.toParent2().toChars());
         return ((f.storage_class & STC.static_) == 0) &&
                 (f.linkage == LINK.d) &&
-                (f.toParent2().isFuncDeclaration() !is null);
+                (f.toParent2().isFuncDeclaration() !is null ||
+                 f.toParent2() !is f.toParent4());
     }
 
     /****************************************
@@ -3150,6 +3185,8 @@ bool followInstantiationContext(Dsymbol s, Dsymbol p)
 {
     static bool has2This(Dsymbol s)
     {
+        if (auto f = s.isFuncDeclaration())
+            return f.vthis2 !is null;
         if (auto ad = s.isAggregateDeclaration())
             return ad.vthis2 !is null;
         return false;

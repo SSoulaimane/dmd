@@ -1050,6 +1050,91 @@ L1:
         return new ObjcClassReferenceExp(e1.loc, cast(ClassDeclaration) ad);
     }
 
+    /* Get `this` of the next outer aggregate.
+     * Returns false on error.
+     */
+    bool skipNestedFunctions(Dsymbol s)
+    {
+        while (s && s.isFuncDeclaration())
+        {
+            FuncDeclaration f = s.isFuncDeclaration();
+            if (f.vthis)
+            {
+                if (f.vthis2)
+                {
+                    if (f.hasNestedFrameRefs())
+                    {
+                        e1 = new DotVarExp(loc, e1, f.vthis2);
+                        e1.type = f.vthis2.type;
+                    }
+                    // (*__this)[i]
+                    e1 = new PtrExp(loc, e1);
+                    e1.type = Type.tvoidptr.sarrayOf(2);
+                    uint i = followInstantiationContext(f, ad);
+                    e1 = new IndexExp(loc, e1, new IntegerExp(i));
+                    e1 = e1.expressionSemantic(sc);
+                    s = toParentP(f, ad);
+                    continue;
+                }
+                else
+                {
+                    if (f.hasNestedFrameRefs())
+                    {
+                        e1 = new DotVarExp(loc, e1, f.vthis);
+                        e1.type = f.vthis.type;
+                    }
+                }
+            }
+            else
+            {
+                e1.error("need `this` of type `%s` to access member `%s` from static function `%s`", ad.toChars(), var.toChars(), f.toChars());
+                e1 = new ErrorExp();
+                return false;
+            }
+            s = s.toParent2();
+        }
+        if (s && e1.type.equivalent(Type.tvoidptr))
+        {
+            if (auto sad = s.isAggregateDeclaration())
+            {
+                Type ta = sad.handleType();
+                if (ta.ty == Tstruct)
+                    ta = ta.pointerTo();
+                ta = ta.addMod(t.mod);
+                e1 = new CastExp(loc, e1, ta);
+                e1.type = ta;
+            }
+        }
+        return true;
+    }
+
+    /* Access of a member which is a template parameter in dual-scope scenario
+     * class A { inc(alias m)() { ++m; } } // `m` needs `this` of `B`
+     * class B {int m; inc() { new A().inc!m(); } }
+     */
+    if (e1.op == TOK.this_)
+    {
+        FuncDeclaration f = hasThis(sc);
+        if (f && f.vthis2)
+        {
+            if (followInstantiationContext(f, ad))
+            {
+                e1 = new VarExp(loc, f.vthis2);
+                e1 = new PtrExp(loc, e1);
+                e1 = new IndexExp(loc, e1, IntegerExp.literal!1);
+                e1 = e1.expressionSemantic(sc);
+                auto pad = f.toParent2().isAggregateDeclaration();
+                e1.type = pad ? pad.handleType() : Type.tvoidptr;
+                e1.type = e1.type.addMod(t.mod);
+                if (e1.type.ty == Tstruct)
+                    e1.type = e1.type.pointerTo();
+                if (!skipNestedFunctions(f.toParent2()))
+                    return e1;
+                goto L1;
+            }
+        }
+    }
+
     /* If e1 is not the 'this' pointer for ad
      */
     if (ad &&
@@ -1071,41 +1156,17 @@ L1:
                 /* e1 is the 'this' pointer for an inner class: tcd.
                  * Rewrite it as the 'this' pointer for the outer class.
                  */
-                e1 = new DotVarExp(loc, e1, tcd.vthis);
-                e1.type = tcd.vthis.type;
+                auto vthis = followInstantiationContext(tcd, ad) ? tcd.vthis2 : tcd.vthis;
+                e1 = new DotVarExp(loc, e1, vthis);
+                e1.type = vthis.type;
                 e1.type = e1.type.addMod(t.mod);
                 // Do not call ensureStaticLinkTo()
                 //e1 = e1.semantic(sc);
 
                 // Skip up over nested functions, and get the enclosing
                 // class type.
-                int n = 0;
-                Dsymbol s;
-                for (s = tcd.toParent(); s && s.isFuncDeclaration(); s = s.toParent())
-                {
-                    FuncDeclaration f = s.isFuncDeclaration();
-                    if (f.vthis)
-                    {
-                        //printf("rewriting e1 to %s's this\n", f.toChars());
-                        n++;
-                        e1 = new VarExp(loc, f.vthis);
-                    }
-                    else
-                    {
-                        e1.error("need `this` of type `%s` to access member `%s` from static function `%s`", ad.toChars(), var.toChars(), f.toChars());
-                        e1 = new ErrorExp();
-                        return e1;
-                    }
-                }
-                if (s && s.isClassDeclaration())
-                {
-                    e1.type = s.isClassDeclaration().type;
-                    e1.type = e1.type.addMod(t.mod);
-                    if (n > 1)
-                        e1 = e1.expressionSemantic(sc);
-                }
-                else
-                    e1 = e1.expressionSemantic(sc);
+                if (!skipNestedFunctions(toParentP(tcd, ad)))
+                    return e1;
                 goto L1;
             }
 
@@ -4815,6 +4876,23 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 result = e.expressionSemantic(sc);
             }
         }
+
+        // declare dual-context container
+        if (exp.f && exp.f.vthis2 && !sc.intypeof && sc.func)
+        {
+            Type tthis2 = Type.tvoidptr.sarrayOf(2);
+            VarDeclaration vthis2 = new VarDeclaration(exp.loc, tthis2, Identifier.generateIdWithLoc("__this", exp.loc), null);
+            vthis2.storage_class |= STC.temp;
+            vthis2.dsymbolSemantic(sc);
+            vthis2.parent = sc.parent;
+            // make it a closure var
+            vthis2.nestedrefs.push(exp.f);
+            sc.func.closureVars.push(vthis2);
+            exp.vthis2 = vthis2;
+            Expression de = new DeclarationExp(exp.loc, vthis2);
+            result = Expression.combine(de, result);
+            result = result.expressionSemantic(sc);
+        }
     }
 
     override void visit(DeclarationExp e)
@@ -5827,7 +5905,7 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
              * If fd obviously has no overloads, we should
              * normalize AST, and it will give a chance to wrap fd with FuncExp.
              */
-            if (fd.isNested() || fd.isFuncLiteralDeclaration())
+            if ((fd.isNested() && !fd.isThis()) || fd.isFuncLiteralDeclaration())
             {
                 // (e1, fd)
                 auto e = symbolToExp(fd, exp.loc, sc, false);
@@ -5963,6 +6041,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
             e.e1 = e.e1.expressionSemantic(sc);
         }
         result = e;
+        if (f.vthis2 && !sc.intypeof && sc.func)
+        {
+            Type tthis2 = Type.tvoidptr.sarrayOf(2);
+            VarDeclaration vthis2 = new VarDeclaration(e.loc, tthis2, Identifier.generateId("__this"), null);
+            vthis2.storage_class |= STC.temp;
+            vthis2.dsymbolSemantic(sc);
+            vthis2.parent = sc.parent;
+            // make it a closure var
+            vthis2.nestedrefs.push(f);
+            sc.func.closureVars.push(vthis2);
+            e.vthis2 = vthis2;
+            Expression de = new DeclarationExp(e.loc, vthis2);
+            result = Expression.combine(de, result);
+            result = result.expressionSemantic(sc);
+        }
     }
 
     override void visit(DotTypeExp exp)
@@ -6134,9 +6227,9 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                  * mark here that we took its address because castTo()
                  * may not be called with an exact match.
                  */
-                if (!ve.hasOverloads || f.isNested())
+                if (!ve.hasOverloads || (f.isNested() && !f.needThis()))
                     f.tookAddressOf++;
-                if (f.isNested())
+                if (f.isNested() && !f.needThis())
                 {
                     if (f.isFuncLiteralDeclaration())
                     {
