@@ -1934,32 +1934,52 @@ private bool functionParameters(const ref Loc loc, Scope* sc,
              *
              * void foo(ref inout(int) x) {
              *   ref inout(int) bar(inout(int)) { return x; }
-             *   struct S { ref inout(int) bar() inout { return x; } }
+             *   struct S {
+             *      ref inout(int) bar() inout { return x; }
+             *      ref inout(int) baz(alias a)() inout { return x; }
+             *   }
              *   bar(int.init) = 1;  // bad!
              *   S().bar() = 1;      // bad!
              * }
+             * void test() {
+             *   int a;
+             *   auto s = foo(a);
+             *   s.baz!a() = 1;      // bad!
+             * }
+             *
              */
-            Dsymbol s = null;
-            if (fd.isThis() || fd.isNested())
-                s = fd.toParent2();
-            for (; s; s = s.toParent2())
+            bool checkEclosingWild(Dsymbol s)
             {
-                if (auto ad = s.isAggregateDeclaration())
+                bool checkWild(Dsymbol s)
                 {
-                    if (ad.isNested())
-                        continue;
-                    break;
-                }
-                if (auto ff = s.isFuncDeclaration())
-                {
-                    if ((cast(TypeFunction)ff.type).iswild)
-                        return errorInout(wildmatch);
+                    if (!s)
+                        return false;
+                    if (auto ad = s.isAggregateDeclaration())
+                    {
+                        if (ad.isNested())
+                            return checkEclosingWild(s);
+                    }
+                    else if (auto ff = s.isFuncDeclaration())
+                    {
+                        if ((cast(TypeFunction)ff.type).iswild)
+                            return errorInout(wildmatch);
 
-                    if (ff.isNested() || ff.isThis())
-                        continue;
+                        if (ff.isNested() || ff.isThis())
+                            return checkEclosingWild(s);
+                    }
+                    return false;
                 }
-                break;
+
+                Dsymbol ctx0 = s.toParent2();
+                Dsymbol ctx1 = s.toParent4();
+                if (checkWild(ctx0))
+                    return true;
+                if (ctx0 != ctx1)
+                    return checkWild(ctx1);
+                return false;
             }
+            if ((fd.isThis() || fd.isNested()) && checkEclosingWild(fd))
+                return true;
         }
         else if (tf.isWild())
             return errorInout(wildmatch);
