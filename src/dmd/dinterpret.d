@@ -796,7 +796,7 @@ private Expression interpretFunction(UnionExp* pue, FuncDeclaration fd, InterSta
     // except for delegates. (Note that the 'this' pointer may be null).
     // Func literals report isNested() even if they are in global scope,
     // so we need to check that the parent is a function.
-    if (fd.isNested() && fd.toParent2().isFuncDeclaration() && !thisarg && istate)
+    if (fd.isNested() && fd.toParent4().isFuncDeclaration() && !thisarg && istate)
         thisarg = ctfeStack.getThis();
 
     if (fd.needThis() && !thisarg)
@@ -876,7 +876,33 @@ private Expression interpretFunction(UnionExp* pue, FuncDeclaration fd, InterSta
     InterState istatex;
     istatex.caller = istate;
     istatex.fd = fd;
-    ctfeStack.startFrame(thisarg);
+
+    Expression this2arg;
+    if (fd.vthis2)
+    {
+        assert(thisarg);
+        Expression arg0 = thisarg;
+        if (arg0.type.ty == Tstruct)
+        {
+            Type t = arg0.type.pointerTo();
+            arg0 = new AddrExp(arg0.loc, arg0);
+            arg0.type = t;
+        }
+        auto elements = new Expressions(2);
+        (*elements)[0] = arg0;
+        (*elements)[1] = ctfeStack.getThis();
+        Type t2 = Type.tvoidptr.sarrayOf(2);
+        this2arg = new ArrayLiteralExp(thisarg.loc, t2, elements);
+        this2arg = new AddrExp(this2arg.loc, this2arg);
+        this2arg.type = t2.pointerTo();
+    }
+
+    ctfeStack.startFrame(this2arg ? this2arg : thisarg);
+    if (fd.vthis2 && this2arg)
+    {
+        ctfeStack.push(fd.vthis2);
+        setValue(fd.vthis2, this2arg);
+    }
     if (fd.vthis && thisarg)
     {
         ctfeStack.push(fd.vthis);
@@ -2020,6 +2046,20 @@ public:
         result = ctfeStack.getThis();
         if (result)
         {
+            if (istate && istate.fd.vthis2)
+            {
+                assert(result.op == TOK.address);
+                result = (cast(AddrExp)result).e1;
+                assert(result.op == TOK.arrayLiteral);
+                result = (*(cast(ArrayLiteralExp)result).elements)[0];
+                if (e.type.ty == Tstruct)
+                {
+                    result.type = e.type.pointerTo();
+                    result = (cast(AddrExp)result).e1;
+                }
+                result.type = e.type;
+                return;
+            }
             assert(result.op == TOK.structLiteral || result.op == TOK.classReference);
             return;
         }
@@ -4980,7 +5020,7 @@ public:
             // Member function call
 
             // Currently this is satisfied because closure is not yet supported.
-            assert(!fd.isNested());
+            assert(!fd.isNested() || fd.vthis2);
 
             if (pthis.op == TOK.typeid_)
             {
