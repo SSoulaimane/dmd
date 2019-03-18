@@ -465,6 +465,12 @@ public:
                 result.type = e.type;
                 return;
             }
+            if (ids.fd && e.var == ids.fd.vthis2)
+            {
+                result = new AddrExp(e.loc, new VarExp(e.loc, ids.vthis));
+                result.type = e.type;
+                return;
+            }
 
             /* Inlining context pointer access for nested referenced variables.
              * For example:
@@ -493,15 +499,50 @@ public:
                 assert(fdv);
                 result = new VarExp(e.loc, ids.vthis);
                 result.type = ids.vthis.type;
+                if (ids.fd.vthis2)
+                {
+                    // &__this
+                    result = new AddrExp(e.loc, result);
+                    result.type = ids.vthis.type.pointerTo();
+                }
                 while (s != fdv)
                 {
                     auto f = s.isFuncDeclaration();
-                    if (auto ad = s.isThis())
+                    AggregateDeclaration ad;
+                    if (f && f.vthis2)
                     {
-                        assert(ad.vthis);
-                        result = new DotVarExp(e.loc, result, ad.vthis);
-                        result.type = ad.vthis.type;
-                        s = ad.toParent2();
+                        if (f.hasNestedFrameRefs())
+                        {
+                            result = new DotVarExp(e.loc, result, f.vthis2);
+                            result.type = f.vthis2.type;
+                        }
+                        // (*__this)[i]
+                        uint i = followInstantiationContext(f, fdv);
+                        result = new PtrExp(e.loc, result);
+                        result.type = Type.tvoidptr.sarrayOf(2);
+                        auto ie = new IndexExp(e.loc, result, new IntegerExp(i));
+                        ie.indexIsInBounds = true; // no runtime bounds checking
+                        result = ie;
+                        result.type = Type.tvoidptr;
+                        s = toParentP(f, fdv);
+                        ad = s.isAggregateDeclaration();
+                        if (ad)
+                            goto Lad;
+                        continue;
+                    }
+                    else if ((ad = s.isThis()) !is null)
+                    {
+                Lad:
+                        while (ad)
+                        {
+                            assert(ad.vthis);
+                            bool i = followInstantiationContext(ad, fdv);
+                            auto vthis = i ? ad.vthis2 : ad.vthis;
+                            result = new DotVarExp(e.loc, result, vthis);
+                            result.type = vthis.type;
+                            s = toParentP(ad, fdv);
+                            ad = s.isAggregateDeclaration();
+                        }
                     }
                     else if (f && f.isNested())
                     {
@@ -536,6 +577,19 @@ public:
                 return;
             }
             result = new VarExp(e.loc, ids.vthis);
+            if (ids.fd.vthis2)
+            {
+                // __this[0]
+                result.type = ids.vthis.type;
+                auto ie = new IndexExp(e.loc, result, IntegerExp.literal!0);
+                ie.indexIsInBounds = true; // no runtime bounds checking
+                result = ie;
+                if (e.type.ty == Tstruct)
+                {
+                    result.type = e.type.pointerTo();
+                    result = new PtrExp(e.loc, result);
+                }
+            }
             result.type = e.type;
         }
 
@@ -543,6 +597,14 @@ public:
         {
             assert(ids.vthis);
             result = new VarExp(e.loc, ids.vthis);
+            if (ids.fd.vthis2)
+            {
+                // __this[0]
+                result.type = ids.vthis.type;
+                auto ie = new IndexExp(e.loc, result, IntegerExp.literal!0);
+                ie.indexIsInBounds = true; // no runtime bounds checking
+                result = ie;
+            }
             result.type = e.type;
         }
 
@@ -1268,7 +1330,7 @@ public:
 
             if (canInline(fd, false, false, asStates))
             {
-                expandInline(e.loc, fd, parent, eret, null, e.arguments, asStates, eresult, sresult, again);
+                expandInline(e.loc, fd, parent, eret, null, e.arguments, asStates, eresult, sresult, again, e.vthis2);
                 if (asStatements && eresult)
                 {
                     sresult = new ExpStatement(eresult.loc, eresult);
@@ -1336,7 +1398,7 @@ public:
                 }
                 else
                 {
-                    expandInline(e.loc, fd, parent, eret, dve.e1, e.arguments, asStatements, eresult, sresult, again);
+                    expandInline(e.loc, fd, parent, eret, dve.e1, e.arguments, asStatements, eresult, sresult, again, e.vthis2);
                 }
             }
         }
@@ -1800,7 +1862,7 @@ Lno:
  */
 private void expandInline(Loc callLoc, FuncDeclaration fd, FuncDeclaration parent, Expression eret,
         Expression ethis, Expressions* arguments, bool asStatements,
-        out Expression eresult, out Statement sresult, out bool again)
+        out Expression eresult, out Statement sresult, out bool again, VarDeclaration vthis2)
 {
     TypeFunction tf = cast(TypeFunction)fd.type;
     static if (LOG || CANINLINE_LOG || EXPANDINLINE_LOG)
@@ -1880,7 +1942,30 @@ private void expandInline(Loc callLoc, FuncDeclaration fd, FuncDeclaration paren
     {
         Expression e0;
         ethis = Expression.extractLast(ethis, e0);
-        if (ethis.op == TOK.variable)
+        assert(vthis2 || !fd.vthis2);
+        if (vthis2)
+        {
+            // void*[2] __this = [ethis, this]
+            if (ethis.type.ty == Tstruct)
+            {
+                // &ethis
+                Type t = ethis.type.pointerTo();
+                ethis = new AddrExp(ethis.loc, ethis);
+                ethis.type = t;
+            }
+            auto elements = new Expressions(2);
+            (*elements)[0] = ethis;
+            auto te = new ThisExp(vthis2.loc);
+            te.ctxt = fd.toParent2();
+            te.ctxtFor = fd;
+            (*elements)[1] = te;
+            Expression ae = new ArrayLiteralExp(vthis2.loc, vthis2.type, elements);
+            Expression ce = new ConstructExp(vthis2.loc, vthis2, ae);
+            ce.type = vthis2.type;
+            vthis2._init = new ExpInitializer(vthis2.loc, ce);
+            vthis = vthis2;
+        }
+        else if (ethis.op == TOK.variable)
         {
             vthis = (cast(VarExp)ethis).var.isVarDeclaration();
         }

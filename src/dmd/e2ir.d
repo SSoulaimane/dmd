@@ -1410,6 +1410,13 @@ elem *toElem(Expression e, IRState *irs)
         override void visit(ThisExp te)
         {
             //printf("ThisExp.toElem()\n");
+            if (te.ctxtFor)
+            {
+                result = getEthis(te.loc, irs, te.ctxtFor, te.ctxt);
+                elem_setLoc(result, te.loc);
+                return;
+            }
+
             assert(irs.sthis);
 
             elem *ethis;

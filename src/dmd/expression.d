@@ -2208,6 +2208,8 @@ extern (C++) final class DsymbolExp : Expression
 extern (C++) class ThisExp : Expression
 {
     VarDeclaration var;
+    Dsymbol ctxt;
+    FuncDeclaration ctxtFor;
 
     extern (D) this(const ref Loc loc)
     {
