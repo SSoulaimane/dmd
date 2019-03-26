@@ -443,6 +443,103 @@ void test11()
 
 /********************************************/
 
+class B12
+{
+    int m;
+
+    auto sum(alias a)()
+    {
+        return a + m;
+    }
+
+    auto inner(alias a)()
+    {
+        class I
+        {
+            int i = 20;
+            auto sum()
+            {
+                return i + a;
+            }
+        }
+        return new I();
+    }
+
+    class R(alias a)
+    {
+        int i = 30;
+        auto sum()
+        {
+            return i + a;
+        }
+    }
+}
+
+class N12
+{
+    int n;
+
+    auto sum()
+    {
+        auto o = new B12();
+        o.m = 10;
+        return o.sum!n();
+    }
+
+    auto sumi()
+    {
+        auto o = new B12();
+        return o.inner!n().sum();
+    }
+
+    auto sumr()
+    {
+        auto o = new B12().new B12.R!n;
+        return o.sum();
+    }
+}
+
+void test12a()
+{
+    int i = 10;
+    class A(alias a)
+    {
+        int sum()
+        {
+            return a + i;
+        }
+    }
+
+    class B
+    {
+        int n;
+        int sum()
+        {
+            return new A!n().sum();
+        }
+    }
+
+    auto b = new B();
+    b.n = 1;
+    assert(b.sum() == 11);
+}
+
+void test12()
+{
+    auto o = new N12();
+    o.n = 1;
+    assert(o.sum() == 11);
+
+    if (!__ctfe) // nested classes not yet ctfeable
+    {
+        assert(o.sumi() == 21);
+        assert(o.sumr() == 31);
+        test12a();
+    }
+}
+
+/********************************************/
+
 int runTests()
 {
     test1();
@@ -456,6 +553,7 @@ int runTests()
     test9();
     test10();
     test11();
+    test12();
     return 0;
 }
 
