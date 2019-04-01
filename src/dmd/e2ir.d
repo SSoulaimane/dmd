@@ -3609,19 +3609,33 @@ elem *toElem(Expression e, IRState *irs)
 
             assert(txb.ty == tyb.ty);
 
+            int voffset = v.offset;
             // https://issues.dlang.org/show_bug.cgi?id=14730
             if (irs.params.useInline && v.offset == 0)
             {
                 FuncDeclaration fd = v.parent.isFuncDeclaration();
                 if (fd && fd.semanticRun < PASS.obj)
                     setClosureVarOffset(fd);
+                voffset = v.offset;
+                if (voffset == 0 && fd && !fd.needsClosure())
+                {
+                    // use stack offset instead
+                    assert(fd.semanticRun >= PASS.obj);
+                    Symbol *s = toSymbol(v);
+                    voffset = cast(int)s.Soffset;
+                    if (fd.vthis)
+                    {
+                        Symbol *vs = toSymbol(fd.vthis2 ? fd.vthis2 : fd.vthis);
+                        voffset -= vs.Soffset;
+                    }
+                }
             }
 
             elem *e = toElem(dve.e1, irs);
             Type tb1 = dve.e1.type.toBasetype();
             if (tb1.ty != Tclass && tb1.ty != Tpointer)
                 e = addressElem(e, tb1);
-            auto offset = el_long(TYsize_t, v.offset);
+            auto offset = el_long(TYsize_t, voffset);
             offset = objc.getOffset(v, tb1, offset);
             e = el_bin(OPadd, TYnptr, e, offset);
             if (v.storage_class & (STC.out_ | STC.ref_))

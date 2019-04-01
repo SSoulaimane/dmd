@@ -497,6 +497,11 @@ public:
                 Dsymbol s = ids.fd;
                 auto fdv = v.toParent().isFuncDeclaration();
                 assert(fdv);
+                if (fdv == ids.parent)
+                {
+                    result = e;
+                    return;
+                }
                 result = new VarExp(e.loc, ids.vthis);
                 result.type = ids.vthis.type;
                 if (ids.fd.vthis2)
@@ -1938,6 +1943,14 @@ private void expandInline(Loc callLoc, FuncDeclaration fd, FuncDeclaration paren
 
     // Set up vthis
     VarDeclaration vthis;
+    if (!ethis && fd.isNested())
+    {
+        auto te = new ThisExp(fd.loc);
+        te.ctxt = fd.toParent4();
+        te.ctxtFor = fd;
+        te.type = Type.tvoidptr;
+        ethis = te;
+    }
     if (ethis)
     {
         Expression e0;
@@ -1972,7 +1985,7 @@ private void expandInline(Loc callLoc, FuncDeclaration fd, FuncDeclaration paren
         else
         {
             //assert(ethis.type.ty != Tpointer);
-            if (ethis.type.ty == Tpointer)
+            if (ethis.type.ty == Tpointer && !fd.isNested())
             {
                 Type t = ethis.type.nextOf();
                 ethis = new PtrExp(ethis.loc, ethis);
@@ -1981,7 +1994,7 @@ private void expandInline(Loc callLoc, FuncDeclaration fd, FuncDeclaration paren
 
             auto ei = new ExpInitializer(fd.loc, ethis);
             vthis = new VarDeclaration(fd.loc, ethis.type, Id.This, ei);
-            if (ethis.type.ty != Tclass)
+            if (ethis.type.ty != Tclass && !fd.isNested())
                 vthis.storage_class = STC.ref_;
             else
                 vthis.storage_class = STC.in_;

@@ -178,6 +178,36 @@ void test8() {
 }
 
 /************************************/
+
+struct S9
+{
+    auto func()
+    {
+        int i;
+
+        auto f0()
+        {
+            int b = 8;
+
+            void inlineMe() { 
+                pragma(inline, true);
+                i = b;
+            }
+
+            inlineMe();
+            return i;
+        }
+        return f0();
+    }
+}
+
+void test9()
+{
+    assert(S9().func() == 8);
+}
+
+/************************************/
+
 // https://issues.dlang.org/show_bug.cgi?id=4841
 
 auto fun4841a()
