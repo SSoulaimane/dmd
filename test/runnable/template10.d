@@ -2,7 +2,7 @@
 
 /********************************************/
 
-void test1()
+void test1a()
 {
     int a = 1;
 
@@ -25,6 +25,41 @@ void test1()
     template TA(alias i) { int v = i; }
     mixin TA!a;
     assert(v == 3);
+}
+
+template t1b(alias a)
+{
+    template u(alias b)
+    {
+        template v(alias c)
+        {
+            auto sum()
+            {
+                return a + b + c;
+            }
+        }
+    }
+}
+
+void test1b()
+{
+    int c = 3;
+    auto f0()
+    {
+        int a = 1;
+        auto f1()
+        {
+            int b = 2;
+            auto r = t1b!a.u!b.v!c.sum();
+            assert(r == 6);
+        }
+    }
+}
+
+void test1()
+{
+    test1a();
+    test1b();
 }
 
 /********************************************/
