@@ -1790,24 +1790,16 @@ extern (C++) class FuncDeclaration : Declaration
         if (!fdthis)
             return false; // out of function scope
 
-        Dsymbol p = toParent2();
+        Dsymbol p = toParent4();
+        Dsymbol p2 = toParent2();
 
         // Function literals from fdthis to p must be delegates
         ensureStaticLinkTo(fdthis, p);
+        if (p != p2)
+            ensureStaticLinkTo(fdthis, p2);
 
         if (isNested())
         {
-            // The function that this function is in
-            FuncDeclaration fdv = p.isFuncDeclaration();
-            if (!fdv)
-                return false;
-            if (fdv == fdthis)
-                return false;
-
-            //printf("this = %s in [%s]\n", this.toChars(), this.loc.toChars());
-            //printf("fdv  = %s in [%s]\n", fdv .toChars(), fdv .loc.toChars());
-            //printf("fdthis = %s in [%s]\n", fdthis.toChars(), fdthis.loc.toChars());
-
             // Add this function to the list of those which called us
             if (fdthis != this)
             {
@@ -1825,15 +1817,33 @@ extern (C++) class FuncDeclaration : Declaration
                 }
             }
 
-            const lv = fdthis.getLevelAndCheck(loc, sc, fdv);
-            if (lv == LevelError)
-                return true; // error
-            if (lv == -1)
-                return false; // downlevel call
-            if (lv == 0)
-                return false; // same level call
+            // The function that this function is in
+            bool checkEnclosing(FuncDeclaration fdv)
+            {
+                if (!fdv)
+                    return false;
+                if (fdv == fdthis)
+                    return false;
 
-            // Uplevel call
+                //printf("this = %s in [%s]\n", this.toChars(), this.loc.toChars());
+                //printf("fdv  = %s in [%s]\n", fdv .toChars(), fdv .loc.toChars());
+                //printf("fdthis = %s in [%s]\n", fdthis.toChars(), fdthis.loc.toChars());
+
+                const lv = fdthis.getLevelAndCheck(loc, sc, fdv);
+                if (lv == LevelError)
+                    return true; // error
+                if (lv == -1)
+                    return false; // downlevel call
+                if (lv == 0)
+                    return false; // same level call
+
+                return false; // Uplevel call
+            }
+
+            if (checkEnclosing(p.isFuncDeclaration()))
+                return true;
+            if (checkEnclosing(p == p2 ? null : p2.isFuncDeclaration()))
+                return true;
         }
         return false;
     }
