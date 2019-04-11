@@ -1031,7 +1031,7 @@ Lagain:
  * Returns:
  *      Expression representing the `this` for the var
  */
-private Expression getRightThis(const ref Loc loc, Scope* sc, AggregateDeclaration ad, Expression e1, Declaration var, int flag = 0)
+private Expression getRightThis(const ref Loc loc, Scope* sc, AggregateDeclaration ad, Expression e1, Dsymbol var, int flag = 0)
 {
     //printf("\ngetRightThis(e1 = %s, ad = %s, var = %s)\n", e1.toChars(), ad.toChars(), var.toChars());
 L1:
@@ -3488,6 +3488,21 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
                 return setError();
             }
 
+            if (cd.vthis2)
+            {
+                if (AggregateDeclaration ad2 = cd.isMember2())
+                {
+                    Expression te = new ThisExp(exp.loc).expressionSemantic(sc);
+                    if (te.op != TOK.error)
+                        te = getRightThis(exp.loc, sc, ad2, te, cd);
+                    if (te.op == TOK.error)
+                    {
+                        exp.error("need `this` of type `%s` needed to `new` nested class `%s`", ad2.toChars(), cd.toChars());
+                        return setError();
+                    }
+                }
+            }
+
             if (cd.aggNew)
             {
                 // Prepend the size argument to newargs[]
@@ -4900,6 +4915,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         // declare dual-context container
         if (exp.f && exp.f.vthis2 && !sc.intypeof && sc.func)
         {
+            if (AggregateDeclaration ad2 = exp.f.isMember2())
+            {
+                Expression te = new ThisExp(exp.loc).expressionSemantic(sc);
+                if (te.op != TOK.error)
+                    te = getRightThis(exp.loc, sc, ad2, te, exp.f);
+                if (te.op == TOK.error)
+                {
+                    exp.error("need `this` of type `%s` to call function `%s`", ad2.toChars(), exp.f.toChars());
+                    return setError();
+                }
+            }
             Type tthis2 = Type.tvoidptr.sarrayOf(2);
             VarDeclaration vthis2 = new VarDeclaration(exp.loc, tthis2, Identifier.generateIdWithLoc("__this", exp.loc), null);
             vthis2.storage_class |= STC.temp;
@@ -6063,6 +6089,17 @@ private extern (C++) final class ExpressionSemanticVisitor : Visitor
         result = e;
         if (f.vthis2 && !sc.intypeof && sc.func)
         {
+            if (AggregateDeclaration ad2 = f.isMember2())
+            {
+                Expression te = new ThisExp(e.loc).expressionSemantic(sc);
+                if (te.op != TOK.error)
+                    te = getRightThis(e.loc, sc, ad2, te, f);
+                if (te.op == TOK.error)
+                {
+                    e.error("need `this` of type `%s` to make delegate from function `%s`", ad2.toChars(), f.toChars());
+                    return setError();
+                }
+            }
             Type tthis2 = Type.tvoidptr.sarrayOf(2);
             VarDeclaration vthis2 = new VarDeclaration(e.loc, tthis2, Identifier.generateId("__this"), null);
             vthis2.storage_class |= STC.temp;
