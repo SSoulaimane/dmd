@@ -14,9 +14,30 @@ jobs:
           # needs to be a separate step, s.t. `run.sh` gets updated too
           command: ./.circleci/run.sh setup-repos
           name: Merge with upstream + clone DRuntime & Phobos
+      # - run:
+      #     command: ./.circleci/run.sh all
+      #     name: Run all
       - run:
-          command: ./.circleci/run.sh all
-          name: Run all
+          command: make -j4 -f posix.mak BUILD=release AUTO_BOOTSTRAP=1
+          name: Build DMD
+      - run:
+          command: make -j4 -C ../druntime -f posix.mak BUILD=release
+          name: Build DRuntime
+      - run:
+          command: make -j4 -C ../phobos -f posix.mak BUILD=release
+          name: Build Phobos
+      - run:
+          command: rm -rf ./test/compilable/issue17167.sh
+          name: disable test 17167
+      - run:
+          command: make -j4 -f posix.mak BUILD=release AUTO_BOOTSTRAP=1 test
+          name: Test DMD
+      - run:
+          command: make -j4 -C ../druntime -f posix.mak BUILD=release unittest
+          name: Test DRuntime
+      - run:
+          command: make -j2 -C ../phobos -f posix.mak BUILD=release AUTO_BOOTSTRAP=1 unittest
+          name: Test Phobos
 workflows:
   version: 2
   all:
