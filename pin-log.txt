@@ -1,0 +1,4 @@
+Pin: pin-3.6-97554-31f0a16
+Copyright (c) 2003-2017, Intel Corporation. All rights reserved.
+A:  Source/pin/vm_ia32_l/emu_ia32_linux.cpp: ExecuteSysArchPrct1: 715: Unknown sub-function for SYS_arch_prctl
+

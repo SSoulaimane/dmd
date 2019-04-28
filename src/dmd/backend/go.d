@@ -225,7 +225,10 @@ int go_flag(char *cp)
     }
     if (go.mfoptim)
     {
-        go.mfoptim |= MFtree | MFdc;       // always do at least this much
+        go.mfoptim = /*MFtree |*/ MFdc /*| MFreg | MFcse*/
+                    //| MFlocal | MFli | MFtime
+                    /*| MFda*/ | MFdv /*| MFcp*/;
+        //go.mfoptim |= MFtree | MFdc;       // always do at least this much
         config.flags4 |= (go.mfoptim & MFtime) ? CFG4speed : CFG4space;
     }
     else

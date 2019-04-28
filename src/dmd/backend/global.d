@@ -91,7 +91,11 @@ extern __gshared
     // cg.c
     Symbol* localgot;
     Symbol* tls_get_addr_sym;
+
 }
+
+// dbg
+__gshared Symbol* _curFunc;
 
 version (MARS)
     __gshared Configv configv;                // non-ph part of configuration

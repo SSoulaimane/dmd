@@ -188,6 +188,8 @@ void codgen(Symbol *sfunc)
     bool flag;
     block *btry;
 
+    config.flags4 &= ~CFG4optimized;
+
     // Register usage. If a bit is on, the corresponding register is live
     // in that basic block.
 
@@ -325,7 +327,7 @@ tryagain:
                     break;
 
                 const sz = type_alignsize(s.Stype);
-                if (sz > STACKALIGN && (I64 || config.exe == EX_OSX))
+                if (1 && sz > STACKALIGN && (I64 || config.exe == EX_OSX))
                 {
                     STACKALIGN = sz;
                     enforcealign = true;
@@ -496,7 +498,7 @@ tryagain:
                 flag = true;
             }
         }
-        if (!I16 && !(config.flags4 & CFG4optimized))
+        if (!I16 && !(/*config.flags4 & CFG4optimized*/ 0))
             break;                      // use the long conditional jmps
     } while (flag);                     // loop till no more bytes saved
 
@@ -1382,7 +1384,7 @@ void stackoffsets(int flags)
                  */
                 Para.offset = _align(REGSIZE,Para.offset); /* align on word stack boundary */
                 if (alignsize >= 16 &&
-                    (I64 || (config.exe == EX_OSX &&
+                    (/*I64*/ 0 || (config.exe == EX_OSX &&
                          (tyaggregate(s.ty()) || tyvector(s.ty())))))
                     Para.offset = (Para.offset + (alignsize - 1)) & ~(alignsize - 1);
                 s.Soffset = Para.offset;

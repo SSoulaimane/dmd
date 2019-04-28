@@ -541,7 +541,9 @@ void cod3_stackalign(ref CodeBuilder cdb, int nbytes)
     //printf("cod3_stackalign(%d)\n", nbytes);
     const grex = I64 ? REX_W << 16 : 0;
     const rm = modregrm(3, 4, SP);             // AND ESP,-nbytes
-    cdb.genc2(0x81, grex | rm, -nbytes);
+    const op = nbytes < 128 ? 0x83 : 0x81;
+    cdb.genc2(op, grex | rm, -nbytes);
+    genmovreg(cdb, SP, SP);
 }
 
 static if (ELFOBJ)
@@ -3186,9 +3188,13 @@ static if (NTEXCEPTIONS == 2)
  * Returns:
  *      generated code
  */
+//void prolog_stackalign(ref CodeBuilder cdb) {}
 void prolog_stackalign(ref CodeBuilder cdb)
 {
-    if (!enforcealign)
+    //if (!strcmp(_curFunc.Sident.ptr, "_D4tabi11test1_out_yFZSQv1y".ptr))
+    //    return;
+
+    if (/*!enforcealign*/ TARGET_STACKALIGN >= STACKALIGN)
         return;
 
     const offset = (hasframe ? 2 : 1) * REGSIZE;   // 1 for the return address + 1 for the PUSH EBP
@@ -3318,7 +3324,7 @@ void prolog_saveregs(ref CodeBuilder cdb, regm_t topush, int cfa_offset)
         int xmmtopush = numbitsset(topush & XMMREGS);   // XMM regs take 16 bytes
         int gptopush = numbitsset(topush) - xmmtopush;  // general purpose registers to save
         targ_size_t xmmoffset = pushoff + BPoff;
-        if (!hasframe || enforcealign)
+        if (!hasframe || /*enforcealign*/ 0)
             xmmoffset += EBPtoESP;
         targ_size_t gpoffset = xmmoffset + xmmtopush * 16;
         while (topush)
@@ -3327,7 +3333,7 @@ void prolog_saveregs(ref CodeBuilder cdb, regm_t topush, int cfa_offset)
             topush &= ~mask(reg);
             if (isXMMreg(reg))
             {
-                if (hasframe && !enforcealign)
+                if (hasframe && /*!enforcealign*/ 1)
                 {
                     // MOVUPD xmmoffset[EBP],xmm
                     cdb.genc1(STOUPD,modregxrm(2,reg-XMM0,BPRM),FLconst,xmmoffset);
@@ -3341,7 +3347,7 @@ void prolog_saveregs(ref CodeBuilder cdb, regm_t topush, int cfa_offset)
             }
             else
             {
-                if (hasframe && !enforcealign)
+                if (hasframe && /*!enforcealign*/ 1)
                 {
                     // MOV gpoffset[EBP],reg
                     cdb.genc1(0x89,modregxrm(2,reg,BPRM),FLconst,gpoffset);
@@ -3420,7 +3426,7 @@ private void epilog_restoreregs(ref CodeBuilder cdb, regm_t topop)
         int xmmtopop = numbitsset(topop & XMMREGS);   // XMM regs take 16 bytes
         int gptopop = numbitsset(topop) - xmmtopop;   // general purpose registers to save
         targ_size_t xmmoffset = pushoff + BPoff;
-        if (!hasframe || enforcealign)
+        if (!hasframe || /*enforcealign*/ 0)
             xmmoffset += EBPtoESP;
         targ_size_t gpoffset = xmmoffset + xmmtopop * 16;
         while (topop)
@@ -3429,7 +3435,7 @@ private void epilog_restoreregs(ref CodeBuilder cdb, regm_t topop)
             topop &= ~mask(reg);
             if (isXMMreg(reg))
             {
-                if (hasframe && !enforcealign)
+                if (hasframe && /*!enforcealign*/ 1)
                 {
                     // MOVUPD xmm,xmmoffset[EBP]
                     cdb.genc1(LODUPD,modregxrm(2,reg-XMM0,BPRM),FLconst,xmmoffset);
@@ -3443,7 +3449,7 @@ private void epilog_restoreregs(ref CodeBuilder cdb, regm_t topop)
             }
             else
             {
-                if (hasframe && !enforcealign)
+                if (hasframe && /*!enforcealign*/ 1)
                 {
                     // MOV reg,gpoffset[EBP]
                     cdb.genc1(0x8B,modregxrm(2,reg,BPRM),FLconst,gpoffset);
@@ -3597,7 +3603,7 @@ void prolog_genvarargs(ref CodeBuilder cdb, Symbol* sv, regm_t namedargs)
 
     static immutable ubyte[vregnum] regs = [ DI,SI,DX,CX,R8,R9 ];
 
-    if (!hasframe || enforcealign)
+    if (!hasframe || /*enforcealign*/ 0)
         voff += EBPtoESP;
 
     for (int i = 0; i < vregnum; i++)
@@ -3606,7 +3612,7 @@ void prolog_genvarargs(ref CodeBuilder cdb, Symbol* sv, regm_t namedargs)
         if (!(mask(r) & namedargs))  // unnamed arguments would be the ... ones
         {
             uint ea = (REX_W << 16) | modregxrm(2,r,BPRM);
-            if (!hasframe || enforcealign)
+            if (!hasframe || /*enforcealign*/ 0)
                 ea = (REX_W << 16) | (modregrm(0,4,SP) << 8) | modregxrm(2,r,4);
             cdb.genc1(0x89,ea,FLconst,voff + i*8);
         }
@@ -3616,7 +3622,7 @@ void prolog_genvarargs(ref CodeBuilder cdb, Symbol* sv, regm_t namedargs)
     cdb.genc2(0xC1,modregrm(3,4,AX),2);                     // SHL EAX,2
     int raxoff = cast(int)(voff+6*8+0x7F);
     uint L2offset = (raxoff < -0x7F) ? 0x2D : 0x2A;
-    if (!hasframe || enforcealign)
+    if (!hasframe || /*enforcealign*/ 0)
         L2offset += 1;                                      // +1 for sib byte
     // LEA R11,offset L2[RIP]
     cdb.genc1(LEA,(REX_W << 16) | modregxrm(0,R11,5),FLconst,L2offset);
@@ -3624,7 +3630,7 @@ void prolog_genvarargs(ref CodeBuilder cdb, Symbol* sv, regm_t namedargs)
     code_orrex(cdb.last(), REX_W);
     // LEA RAX,voff+vsize-6*8-16+0x7F[RBP]
     uint ea = (REX_W << 16) | modregrm(2,AX,BPRM);
-    if (!hasframe || enforcealign)
+    if (!hasframe || /*enforcealign*/ 0)
         // add sib byte for [RSP] addressing
         ea = (REX_W << 16) | (modregrm(0,4,SP) << 8) | modregxrm(2,AX,4);
     cdb.genc1(LEA,ea,FLconst,raxoff);
@@ -3769,7 +3775,7 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, out regm_
                 if (s.Sclass == SCshadowreg)
                     offset = Para.size;
                 offset += s.Soffset;
-                if (!hasframe || (enforcealign && s.Sclass != SCshadowreg))
+                if (!hasframe || (/*enforcealign*/ 0 && s.Sclass != SCshadowreg))
                     offset += EBPtoESP;
 
                 reg_t preg = s.Spreg;
@@ -3781,13 +3787,13 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, out regm_
                         op = xmmstore(t.Tty);
                     if (!(pushalloc && preg == pushallocreg) || s.Sclass == SCshadowreg)
                     {
-                        if (hasframe && (!enforcealign || s.Sclass == SCshadowreg))
+                        if (hasframe && (1 /*!enforcealign*/ || s.Sclass == SCshadowreg))
                         {
                             // MOV x[EBP],preg
                             cdb.genc1(op,modregxrm(2,preg,BPRM),FLconst,offset);
                             if (isXMMreg(preg))
                             {
-                                checkSetVex(cdb.last(), t.Tty);
+                                //checkSetVex(cdb.last(), t.Tty);
                             }
                             else
                             {
@@ -3806,7 +3812,7 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, out regm_
                                        modregxrm(2,preg,4),FLconst,offset);
                             if (isXMMreg(preg))
                             {
-                                checkSetVex(cdb.last(), t.Tty);
+                                //checkSetVex(cdb.last(), t.Tty);
                             }
                             else
                             {
@@ -4877,11 +4883,11 @@ void assignaddrc(code *c)
                     c.Iflags = CFoff;
                     c.IFL1 = FLconst;
                     c.IEV1.Vuns = -EBPtoESP;
-                    if (enforcealign)
+                    if (/*enforcealign*/ 0)
                     {
                         // AND ESP, -STACKALIGN
                         code *cn = code_calloc();
-                        cn.Iop = 0x81;
+                        cn.Iop = STACKALIGN < 128 ? 0x83 : 0x81;
                         cn.Irm = modregrm(3, 4, SP);
                         cn.Iflags = CFoff;
                         cn.IFL2 = FLconst;
@@ -4896,7 +4902,7 @@ void assignaddrc(code *c)
             else if (c.Iop == (ESCAPE | ESCframeptr))
             {   // Convert to load of frame pointer
                 // c.Irm is the register to use
-                if (hasframe && !enforcealign)
+                if (hasframe && /*!enforcealign*/ 1)
                 {   // MOV reg,EBP
                     c.Iop = 0x89;
                     if (c.Irm & 8)
@@ -5037,7 +5043,7 @@ void assignaddrc(code *c)
                     if (s.Sflags & SFLunambig)
                         c.Iflags |= CFunambig;
             L2:
-                    if (!hasframe || (enforcealign && c.IFL1 != FLpara))
+                    if (!hasframe || (/*enforcealign*/ 0 && c.IFL1 != FLpara))
                     {   /* Convert to ESP relative address instead of EBP */
                         assert(!I16);
                         c.IEV1.Vpointer += EBPtoESP;
@@ -5184,7 +5190,7 @@ void assignaddrc(code *c)
             case FLauto:
                 c.IEV2.Vpointer += s.Soffset + Auto.size + BPoff;
             L3:
-                if (!hasframe || (enforcealign && c.IFL2 != FLpara))
+                if (!hasframe || (/*enforcealign*/ 0 && c.IFL2 != FLpara))
                     /* Convert to ESP relative address instead of EBP */
                     c.IEV2.Vpointer += EBPtoESP;
                 break;
@@ -5283,7 +5289,8 @@ targ_size_t cod3_bpoffset(Symbol *s)
  *      c = code list to optimize
  */
 
-void pinholeopt(code *c,block *b)
+void pinholeopt(code *c,block *b) {}
+void _pinholeopt(code *c,block *b)
 {
     targ_size_t a;
     uint mod;

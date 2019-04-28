@@ -1106,6 +1106,7 @@ else
 private void writefunc2(Symbol *sfunc)
 {
     func_t *f = sfunc.Sfunc;
+    _curFunc = sfunc;
 
     //printf("writefunc(%s)\n",sfunc.Sident.ptr);
     debug debugy && printf("writefunc(%s)\n",sfunc.Sident.ptr);

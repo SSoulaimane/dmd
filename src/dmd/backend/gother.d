@@ -1741,6 +1741,12 @@ void deadvar()
 {
         assert(dfo);
 
+        static __cnt = 0;
+        printf("deadvar __cnt %d\n", __cnt);
+        printf("_curFunc %s\n", _curFunc.Sident.ptr);
+        if (0 == __cnt++)
+            /*return;*/{}
+
         /* First, mark each candidate as dead.  */
         /* Initialize vectors for live ranges.  */
         for (SYMIDX i = 0; i < globsym.top; i++)
@@ -1786,8 +1792,8 @@ void deadvar()
             {
                 p = cast(char *) s.Sident.ptr ;
                 if (s.Sflags & SFLdead)
-                    if (debugc) printf("Symbol %d '%s' is dead\n",i,p);
-                if (debugc && s.Srange /*&& s.Sclass != CLMOS*/)
+                    if (1) printf("Symbol %d '%s' is dead\n",i,p);
+                if (1 && s.Srange /*&& s.Sclass != CLMOS*/)
                 {
                     printf("Live range for %d '%s': ",i,p);
                     vec_println(s.Srange);
