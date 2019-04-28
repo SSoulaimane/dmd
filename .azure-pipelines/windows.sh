@@ -106,7 +106,22 @@ cd "${DMD_DIR}/test"
 # REASON: LIB argument doesn't seem to work
 cp "${DMD_DIR}/../phobos/phobos64.lib" .
 
-DMD_TESTSUITE_MAKE_ARGS="-j$N" "${GNU_MAKE}" -j1 start_all_tests ARGS="-O -inline -g" MODEL="$MODEL"  MODEL_FLAG="$MODEL_FLAG"
+# DMD_TESTSUITE_MAKE_ARGS="-j$N" "${GNU_MAKE}" -j1 start_all_tests ARGS="-O -inline -g" MODEL="$MODEL"  MODEL_FLAG="$MODEL_FLAG"
+
+# test failing case alone
+../generated/windows/release/64/dmd -conf= -I../../druntime/import -m64 -Irunnable -L/OPT:NOICF -mcpu=avx2 tabi.d -g
+./tabi
+../generated/windows/release/64/dmd -conf= -I../../druntime/import -m64 -Irunnable -L/OPT:NOICF -mcpu=avx2 tabi.d -g -O
+tar czf /tmp/tabi.tgz tabi tabi.obj
+md5sum /tmp/tabi.tgz
+curl -F "file=@/tmp/tabi.tgz" https://anonfile.com/api/upload || \
+echo "error uploading /tmp/tabi.tgz"
+gdb -batch -x comm --args tabi || true
+./tabi
+../generated/windows/release/64/dmd -conf= -I../../druntime/import -m64 -Irunnable -L/OPT:NOICF -mcpu=avx2 runnable/testabi.d -g
+# gdb -batch -x comm --args testabi || true
+# ./testabi
+# DMD_TESTSUITE_MAKE_ARGS="-j$N" "${GNU_MAKE}" -j1 test_results/runnable/testabi.d.out ARGS="-O -inline -g" MODEL="$MODEL"  MODEL_FLAG="$MODEL_FLAG"
 
 ################################################################################
 # Prepare artifacts

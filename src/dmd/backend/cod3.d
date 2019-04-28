@@ -4123,7 +4123,7 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, out regm_
                             cdb.genc1(op,modregxrm(2,preg,BPRM),FLconst,offset);
                             if (isXMMreg(preg))
                             {
-                                checkSetVex(cdb.last(), t.Tty);
+                                //checkSetVex(cdb.last(), t.Tty);
                             }
                             else
                             {
@@ -4142,7 +4142,7 @@ void prolog_loadparams(ref CodeBuilder cdb, tym_t tyf, bool pushalloc, out regm_
                                        modregxrm(2,preg,4),FLconst,offset);
                             if (isXMMreg(preg))
                             {
-                                checkSetVex(cdb.last(), t.Tty);
+                                //checkSetVex(cdb.last(), t.Tty);
                             }
                             else
                             {

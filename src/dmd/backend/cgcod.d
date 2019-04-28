@@ -325,7 +325,7 @@ tryagain:
                     break;
 
                 const sz = type_alignsize(s.Stype);
-                if (sz > STACKALIGN && (I64 || config.exe == EX_OSX))
+                if (sz > STACKALIGN && tyvector(s.ty()) && (I64 || config.exe == EX_OSX))
                 {
                     STACKALIGN = sz;
                     enforcealign = true;
@@ -1382,7 +1382,7 @@ void stackoffsets(int flags)
                  */
                 Para.offset = _align(REGSIZE,Para.offset); /* align on word stack boundary */
                 if (alignsize >= 16 &&
-                    (I64 || (config.exe == EX_OSX &&
+                    (I64 && tyvector(s.ty()) || (config.exe == EX_OSX &&
                          (tyaggregate(s.ty()) || tyvector(s.ty())))))
                     Para.offset = (Para.offset + (alignsize - 1)) & ~(alignsize - 1);
                 s.Soffset = Para.offset;

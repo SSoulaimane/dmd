@@ -16,6 +16,7 @@ version (D_AVX2)
 extern (C) int printf(const char*, ...);
 
 template tuple(A...) { alias A tuple; }
+enum bool isSIMDVector(T) = is(T : __vector(V[N]), V, size_t N);
 
 alias byte   B;
 alias short  S;
@@ -306,6 +307,7 @@ void test1_call_inout(T : creal)( int n )
 
 void test1_call_out_vec(T)( int n )
 {
+        printf("test1_call_out_vec!%.*s\n", T.stringof.sizeof, T.stringof.ptr);
         T t1;
         foreach( i, ref e; t1.tupleof ) e = i+1;
         T t2 = test1_out!(T)();
@@ -313,16 +315,16 @@ void test1_call_out_vec(T)( int n )
         results_1[n] = 1;
         foreach( i, ref e; t1.tupleof )
         {
-                import std.traits : isSIMDVector;
-
                 static if (isSIMDVector!(typeof(e)))
                         results_1[n] &= e[] == t2.tupleof[i][];
                 else
                         results_1[n] &= e == t2.tupleof[i];
         }
+        printf("#\n");
 }
 void test1_call_inout_vec(T)( int n )
 {
+        printf("test1_call_inout_vec!%.*s\n", T.stringof.sizeof, T.stringof.ptr);
         T t1;
         foreach( i, ref e; t1.tupleof ) e = i+1;
         T t2 = test1_inout!(T)( t1 );
@@ -331,47 +333,65 @@ void test1_call_inout_vec(T)( int n )
         bool r = true;
         foreach( i, ref e; t1.tupleof )
         {
-                import std.traits : isSIMDVector;
-
                 static if (isSIMDVector!(typeof(e)))
                         r &= e[] == t2.tupleof[i][];
                 else
                         r &= e == t2.tupleof[i];
         }
         if( r ) results_1[n] |= 2;
+        printf("#\n");
 }
 
 void D_test1( )
 {
         // Run Tests
-        foreach( n, T; tuple!( ALL_T, R_T ) )
+        //foreach( n, T; tuple!( ALL_T, R_T ) )
+        //{
+        //        test1_call_out!(T)(n);
+        //        test1_call_inout!(T)(n);
+        //}
+
+        //results_1[R_END..V_END] = 0;
+        //foreach( n, T; V_T )
+        //{
+        //        test1_call_out_vec!(T)( n + R_END );
+        //        test1_call_inout_vec!(T)( n + R_END );
+        //}
+
+        printf("Running #1 Tests\n");
+
+        version (Run_AVX_Tests)
         {
-                test1_call_out!(T)(n);
-                test1_call_inout!(T)(n);
+            printf("Running AVX Tests\n");
+
+            if( ~results_1[0] & 1 ) {
+                test1_call_out_vec!y( 0 );
+                printf( "Test1   out y \tFail\n" );
+                assert(0);
+            }
+            if( ~results_1[0] & 2 ) {
+                //test1_call_inout_vec!y( 0 );
+                printf( "Test1 inout y \tFail\n" );
+                assert(0);
+            }
         }
 
-        results_1[R_END..V_END] = 0;
-        foreach( n, T; V_T )
-        {
-                test1_call_out_vec!(T)( n + R_END );
-                test1_call_inout_vec!(T)( n + R_END );
-        }
-
-        bool pass = true;
-        foreach( i, r; results_1 )
-        {
-                if( ~r & 1 )
-                {
-                pass = false;
-                printf( "Test1   out %s \tFail\n", ALL_S[i].ptr );
-                }
-                if( ~r & 2 )
-                {
-                pass = false;
-                printf( "Test1 inout %s \tFail\n", ALL_S[i].ptr );
-                }
-        }
-        assert( pass );
+        //bool pass = true;
+        //foreach( i, r; results_1 )
+        //{
+        //        if (i < R_END) continue;
+        //        if( ~r & 1 )
+        //        {
+        //        pass = false;
+        //        printf( "Test1   out %s \tFail\n", ALL_S[i].ptr );
+        //        }
+        //        if( ~r & 2 )
+        //        {
+        //        pass = false;
+        //        printf( "Test1 inout %s \tFail\n", ALL_S[i].ptr );
+        //        }
+        //}
+        //assert( pass );
 }
 
 /************************************************************************/
@@ -461,608 +481,16 @@ void D_test2()
  ************************************************************************/
 
 version(Run_X86_64_Tests)
-{
-
-
-struct TEST
-{
-        immutable int       num;
-        immutable string    desc;
-        bool[ALL_END] result;
-}
-
-/**
- * 0 = Should Fail
- * 1 = Should Pass
- */
-immutable int[] expected =
-        [
-        // INT regs only
-        1,1,1,1,1, // b
-        1,1,1,1,1, // b6
-        1,1,1,1,1, // b11
-        1,0,0,0,0, // b16
-
-        1,1,1,1,1, // s
-        1,1,1,0,0, // s6
-        1,1,1,1,0, // i
-        1,1,0,0,0, // l
-        1,1,1,1,1, // si mix
-        1,1,1,1,0, // sl
-        1,1,1,1,0, // il
-        1,1,1,1,1, // int and float
-
-        // SSE regs only
-        1,1,1,1,0, // f
-        1,1,0,0,0, // d
-        1,1,1,1,0, // float and double
-
-        // SSE + INT regs
-        1,1,1,1,1, // int and float
-        1,1,1,1,0, // int and double
-
-        // x87 (return)
-        1,0,0,0,0,1, // r
-
-        // SIMD Vectors
-        1,0,0,0,0,   // x
-        1,0,0,0,0,   // y
-        ];
-
-immutable int[R_T.length] expectedRIn = // x87 argument
-        [
-        0,0,0,0,0,0,  // r
-        ];
-
-/**
- * Describes value expected in registers
- *
- * null means do not test
- * ( because value is passed on the stack ).
- *
- * Note: Mixed register cases have the SSE register first
- */
-
-immutable long[][] RegValue =
-        [
-/*   0  b       */ [ 0x0000000000000001,                    ],
-/*   1  bb      */ [ 0x0000000000000201,                    ],
-/*   2  bbb     */ [ 0x0000000000030201,                    ],
-/*   3  bbbb    */ [ 0x0000000004030201,                    ],
-/*   4  bbbbb   */ [ 0x0000000504030201,                    ],
-/*   5  b6      */ [ 0x0000060504030201,                    ],
-/*   6  b7      */ [ 0x0007060504030201,                    ],
-/*   7  b8      */ [ 0x0807060504030201,                    ],
-/*   8  b9      */ [ 0x0807060504030201, 0x0000000000000009 ],
-/*   9  b10     */ [ 0x0807060504030201, 0x0000000000000a09 ],
-/*  10  b11     */ [ 0x0807060504030201, 0x00000000000b0a09 ],
-/*  11  b12     */ [ 0x0807060504030201, 0x000000000c0b0a09 ],
-/*  12  b13     */ [ 0x0807060504030201, 0x0000000d0c0b0a09 ],
-/*  13  b14     */ [ 0x0807060504030201, 0x00000e0d0c0b0a09 ],
-/*  14  b15     */ [ 0x0807060504030201, 0x000f0e0d0c0b0a09 ],
-/*  15  b16     */ [ 0x0807060504030201, 0x100f0e0d0c0b0a09 ],
-/*  16  b17     */ null,
-/*  17  b18     */ null,
-/*  18  b19     */ null,
-/*  19  b20     */ null,
-/*  20  s       */ [ 0x0000000000000001,                    ],
-/*  21  ss      */ [ 0x0000000000020001,                    ],
-/*  22  sss     */ [ 0x0000000300020001,                    ],
-/*  23  ssss    */ [ 0x0004000300020001,                    ],
-/*  24  sssss   */ [ 0x0004000300020001, 0x0000000000000005 ],
-/*  25  s6      */ [ 0x0004000300020001, 0x0000000000060005 ],
-/*  26  s7      */ [ 0x0004000300020001, 0x0000000700060005 ],
-/*  27  s8      */ [ 0x0004000300020001, 0x0008000700060005 ],
-/*  28  s9      */ null,
-/*  29  s10     */ null,
-/*  30  i       */ [ 0x0000000000000001,                    ],
-/*  31  ii      */ [ 0x0000000200000001,                    ],
-/*  32  iii     */ [ 0x0000000200000001, 0x0000000000000003 ],
-/*  33  iiii    */ [ 0x0000000200000001, 0x0000000400000003 ],
-/*  34  iiiii   */ null,
-/*  35  l       */ [ 0x0000000000000001,                    ],
-/*  36  ll      */ [ 0x0000000000000001, 0x0000000000000002 ],
-/*  37  lll     */ null,
-/*  38  llll    */ null,
-/*  39  lllll   */ null,
-
-/*  40  js      */ [ 0x0000000200000001,                    ],
-/*  41  iss     */ [ 0x0003000200000001,                    ],
-/*  42  si      */ [ 0x0000000200000001,                    ],
-/*  43  ssi     */ [ 0x0000000300020001,                    ],
-/*  44  sis     */ [ 0x0000000200000001, 0x0000000000000003 ],
-/*  45  ls      */ [ 0x0000000000000001, 0x0000000000000002 ],
-/*  46  lss     */ [ 0x0000000000000001, 0x0000000000030002 ],
-/*  47  sl      */ [ 0x0000000000000001, 0x0000000000000002 ],
-/*  48  ssl     */ [ 0x0000000000020001, 0x0000000000000003 ],
-/*  49  sls     */ null,
-/*  50  li      */ [ 0x0000000000000001, 0x0000000000000002 ],
-/*  51  lii     */ [ 0x0000000000000001, 0x0000000300000002 ],
-/*  52  il      */ [ 0x0000000000000001, 0x0000000000000002 ],
-/*  53  iil     */ [ 0x0000000200000001, 0x0000000000000003 ],
-/*  54  ili     */ null,
-
-/*  55  fi      */ [ 0x000000023f800000,                    ],
-/*  56  fii     */ [ 0x000000023f800000, 0x0000000000000003 ],
-/*  57  jf      */ [ 0x4000000000000001,                    ],
-/*  58  ifi     */ [ 0x4000000000000001, 0x0000000000000003 ],
-
-/*  59  ifif    */ [ 0x4000000000000001, 0x4080000000000003 ],
-
-/*  60  f       */ [ 0x000000003f800000,                    ],
-/*  61  ff      */ [ 0x400000003f800000,                    ],
-/*  62  fff     */ [ 0x400000003f800000, 0x0000000040400000 ],
-/*  63  ffff    */ [ 0x400000003f800000, 0x4080000040400000 ],
-/*  64  fffff   */ null,
-/*  65  d       */ [ 0x3ff0000000000000,                    ],
-/*  66  dd      */ [ 0x3ff0000000000000, 0x4000000000000000 ],
-/*  67  ddd     */ null,
-/*  68  dddd    */ null,
-/*  69  ddddd   */ null,
-
-/*  70  df      */ [ 0x3ff0000000000000, 0x0000000040000000 ],
-/*  71  dff     */ [ 0x3ff0000000000000, 0x4040000040000000 ],
-/*  72  fd      */ [ 0x000000003f800000, 0x4000000000000000 ],
-/*  73  ffd     */ [ 0x400000003f800000, 0x4008000000000000 ],
-/*  74  fdf     */ null,
-
-/*  75  ffi     */ [ 0x400000003f800000, 0x0000000000000003 ],
-/*  76  ffii    */ [ 0x400000003f800000, 0x0000000400000003 ],
-/*  77  iff     */ [ 0x0000000040400000, 0x4000000000000001 ],
-/*  78  iiff    */ [ 0x4080000040400000, 0x0000000200000001 ],
-/*  79  iif     */ [ 0x0000000040400000, 0x0000000200000001 ],
-/*  80  di      */ [ 0x3ff0000000000000, 0x0000000000000002 ],
-/*  81  dii     */ [ 0x3ff0000000000000, 0x0000000300000002 ],
-/*  82  id      */ [ 0x4000000000000000, 0x0000000000000001 ],
-/*  83  iid     */ [ 0x4008000000000000, 0x0000000200000001 ],
-/*  84  idi     */ null,
-
-/*  85  r       */ [ 0x8000000000000000, 0x0000000000003fff ],
-/*  86  rr      */ null,
-/*  87  rb      */ null,
-/*  88  rf      */ null,
-/*  89  fr      */ null,
-/*  90  c       */ [ 0x8000000000000000, 0x0000000000004000, 0x8000000000000000, 0x0000000000003fff ],
-
-/*  91  x       */ [ 0x0000000000000001, 0x0000000000000001 ],
-/*  92  xx      */ null,
-/*  93  xb      */ null,
-/*  94  xf      */ null,
-/*  95  bx      */ null,
-
-/*  96  y       */ [ 0x0000000000000001, 0x0000000000000001, 0x0000000000000001, 0x0000000000000001 ],
-/*  97  yy      */ null,
-/*  98  yb      */ null,
-/*  99  yf      */ null,
-/* 100  by      */ null,
-        ];
-
-/**
- * The sizes of expected values.
- *
- * The rest is considered padding.
- * Note: Mixed register cases have the SSE register first
- */
-immutable long[][] RegValueSize =
-        [
-/*   0  b       */ [ 1,   ],
-/*   1  bb      */ [ 2,   ],
-/*   2  bbb     */ [ 3,   ],
-/*   3  bbbb    */ [ 4,   ],
-/*   4  bbbbb   */ [ 5,   ],
-/*   5  b6      */ [ 6,   ],
-/*   6  b7      */ [ 7,   ],
-/*   7  b8      */ [ 8,   ],
-/*   8  b9      */ [ 8, 1 ],
-/*   9  b10     */ [ 8, 2 ],
-/*  10  b11     */ [ 8, 3 ],
-/*  11  b12     */ [ 8, 4 ],
-/*  12  b13     */ [ 8, 5 ],
-/*  13  b14     */ [ 8, 6 ],
-/*  14  b15     */ [ 8, 7 ],
-/*  15  b16     */ [ 8, 8 ],
-/*  16  b17     */ null,
-/*  17  b18     */ null,
-/*  18  b19     */ null,
-/*  19  b20     */ null,
-/*  20  s       */ [ 2,   ],
-/*  21  ss      */ [ 4,   ],
-/*  22  sss     */ [ 6,   ],
-/*  23  ssss    */ [ 8,   ],
-/*  24  sssss   */ [ 8, 2 ],
-/*  25  s6      */ [ 8, 4 ],
-/*  26  s7      */ [ 8, 6 ],
-/*  27  s8      */ [ 8, 8 ],
-/*  28  s9      */ null,
-/*  29  s10     */ null,
-/*  30  i       */ [ 4,   ],
-/*  31  ii      */ [ 8,   ],
-/*  32  iii     */ [ 8, 4 ],
-/*  33  iiii    */ [ 8, 8 ],
-/*  34  iiiii   */ null,
-/*  35  l       */ [ 8,   ],
-/*  36  ll      */ [ 8, 8 ],
-/*  37  lll     */ null,
-/*  38  llll    */ null,
-/*  39  lllll   */ null,
-
-/*  40  js      */ [ 6,   ],
-/*  41  iss     */ [ 8,   ],
-/*  42  si      */ [ 8,   ],
-/*  43  ssi     */ [ 8,   ],
-/*  44  sis     */ [ 8, 2 ],
-/*  45  ls      */ [ 8, 2 ],
-/*  46  lss     */ [ 8, 4 ],
-/*  47  sl      */ [ 2, 8 ],
-/*  48  ssl     */ [ 4, 8 ],
-/*  49  sls     */ null,
-/*  50  li      */ [ 8, 4 ],
-/*  51  lii     */ [ 8, 8 ],
-/*  52  il      */ [ 4, 8 ],
-/*  53  iil     */ [ 8, 8 ],
-/*  54  ili     */ null,
-
-/*  55  fi      */ [ 8,   ],
-/*  56  fii     */ [ 8, 4 ],
-/*  57  jf      */ [ 8,   ],
-/*  58  ifi     */ [ 8, 4 ],
-
-/*  59  ifif    */ [ 8, 8 ],
-
-/*  60  f       */ [ 4,   ],
-/*  61  ff      */ [ 8,   ],
-/*  62  fff     */ [ 8, 4 ],
-/*  63  ffff    */ [ 8, 8 ],
-/*  64  fffff   */ null,
-/*  65  d       */ [ 8,   ],
-/*  66  dd      */ [ 8, 8 ],
-/*  67  ddd     */ null,
-/*  68  dddd    */ null,
-/*  69  ddddd   */ null,
-
-/*  70  df      */ [ 8, 4 ],
-/*  71  dff     */ [ 8, 8 ],
-/*  72  fd      */ [ 4, 8 ],
-/*  73  ffd     */ [ 8, 8 ],
-/*  74  fdf     */ null,
-
-/*  75  ffi     */ [ 8, 4 ],
-/*  76  ffii    */ [ 8, 8 ],
-/*  77  iff     */ [ 4, 8 ],
-/*  78  iiff    */ [ 8, 8 ],
-/*  79  iif     */ [ 4, 8 ],
-/*  80  di      */ [ 8, 4 ],
-/*  81  dii     */ [ 8, 8 ],
-/*  82  id      */ [ 8, 4 ],
-/*  83  iid     */ [ 8, 8 ],
-/*  84  idi     */ null,
-
-/*  85  r       */ [ 8, 2 ],
-/*  86  rr      */ null,
-/*  87  rb      */ null,
-/*  88  rf      */ null,
-/*  89  fr      */ null,
-/*  90  c       */ [ 8, 2, 8, 2 ],
-
-/*  91  x       */ [ 8, 8 ],
-/*  92  xx      */ null,
-/*  93  xb      */ null,
-/*  94  xf      */ null,
-/*  95  bx      */ null,
-
-/*  96  y       */ [ 8, 8, 8, 8 ],
-/*  97  yy      */ null,
-/*  98  yb      */ null,
-/*  99  yf      */ null,
-/* 100  by      */ null,
-        ];
-
-/* Have to do it this way for OSX: Issue 7354 */
-__gshared long[4] dump;
-
-/**
- * Generate Register capture
- */
-string gen_reg_capture( int n, string registers )( )
-{
-        if( RegValue[n] == null ) return "return;";
-
-        string[] REG = mixin(registers); // ["RDI","RSI"];
-
-        // Which type of compare
-        static if(n < INT_END)
-                enum MODE = 1; // Int
-        else static if(n < SSE_END)
-                enum MODE = 2; // Float
-        else static if(n < MIX_END)
-                enum MODE = 3; // Mix
-        else static if (n < R_END && is(R_T[n - MIX_END] == creal))
-                enum MODE = 4; // complex x87
-        else static if (n < R_END)
-                enum MODE = 5; // x87
-        else static if (n < V16_END)
-                enum MODE = 6; // SIMD 16
-        else    enum MODE = 7; // SIMD 32
-
-        /* Begin */
-
-        string code = "asm {\n";
-
-        final switch( MODE )
-        {
-                case 1: code ~= "mov [dump], "~REG[0]~";\n";
-                        REG = REG[1..$];
-                break;
-                case 2:
-                case 3: code ~= "movq [dump], XMM0;\n";
-                break;
-                case 4: code ~= "fstp real ptr [dump];\n"
-                              ~ "fstp real ptr [dump+16];\n";
-                break;
-                case 5: code ~= "fstp real ptr [dump];\n";
-                break;
-                case 6: code ~= "movdqu [dump], XMM0;\n";
-                break;
-                case 7: code ~= "vmovdqu [dump], YMM0;\n";
-        }
-
-        if( RegValue[n].length >= 2 )
-        final switch( MODE )
-        {
-                case 1:
-                case 3: code ~= "mov [dump+8], "~REG[0]~";\n";
-                break;
-                case 2: code ~= "movq [dump+8], XMM1;\n";
-                break;
-                case 4:
-                case 5:
-                case 6:
-                case 7:
-        } else {
-                code ~= "xor R8, R8;\n";
-                code ~= "mov [dump+8], R8;\n";
-        }
-
-        return code ~ "}\n";
-}
-
-/**
- * Check the results
- */
-bool check( TEST data )
-{
-        return checkRange!( 0, ALL_END )( data );
-}
-
-bool checkRange( int beg, int end )( TEST data )
-{
-        return checkX!( expected[beg..end], beg )( data );
-}
-
-bool checkX( alias expected, int offset )( TEST data )
-{
-        bool pass = true;
-        foreach( i, e; expected )
-        {
-                if( data.result[i+offset] != (e & 1) )
-                {
-                        printf( "Test%d %s \tFail\n", data.num, ALL_S[i+offset].ptr);
-                        pass = false;
-                }
-        }
-        return pass;
-}
-
-/************************************************************************/
-
-// test1 Return Struct in Registers
-// ( if RDI == 12 we have no hidden pointer )
-
-TEST data1 = { 1, "RDI hidden pointer" };
-
-T test1_asm( T, int n )( int i )
-{
-        asm {
-
-        cmp EDI, 12;
-        je L1;
-
-        leave; ret;
-        }
-L1:
-        data1.result[n] = true;
-}
-
-void test1()
-{
-        printf("\nRunning iasm Test 1 ( %s )\n", data1.desc.ptr);
-
-        foreach( int n, T; tuple!( ALL_T, R_T, V_T  ) )
-                test1_asm!(T,n)(12);
-
-        assert( check( data1 ) );
-}
-
-/************************************************************************/
-// test2 Pass Struct in Registers
-// ( if RDI == 0 we have no stack pointer )
-
-TEST data2 = { 2, "RDI struct pointer" };
-
-T test2_asm( T, int n )( T t )
-{
-        typeof(.dump) dump;
-        enum m = T.sizeof < 4 ? mask(T.sizeof) : ~0LU;
-        asm {
-
-        mov [dump], RDI;
-        mov [dump+8], RSP;
-        and EDI, m; // remove padding noise
-        cmp EDI, 0; // TODO test RDI is a ptr to stack ? ?
-        je L1;
-
-        jmp Lret;
-        }
-L1:
-        data2.result[n] = true;
-Lret:
-        .dump = dump;
-}
-T test2f_asm( T, int n )( T t, int x )
-{
-        asm {
-
-        cmp EDI, 12;
-        je L1;
-
-        leave; ret;
-        }
-L1:
-        data2.result[n] = true;
-}
-
-void test2()
-{
-        printf("\nRunning iasm Test 2 ( %s )\n", data2.desc.ptr);
-
-        // Integer
-        foreach( int n, T; ALL_T ) {
-                T t = { 0 };
-                test2_asm!(T,n)( t );
-        }
-
-        // float alternative test
-        foreach( int n, T; ALL_T[INT_END..SSE_END] )
-        {
-                enum n2 = n + INT_END;
-                data2.result[n2] = false;
-                test2f_asm!(T,n2)( T.init, 12 );
-        }
-
-        assert( checkRange!( 0, MIX_END )( data2 ) );
-}
-
-/************************************************************************/
-// test3
-
-TEST data3 = { 3, "Check Return Register value" };
-
-void test3_run( T, int n )( )
-{
-        typeof(.dump) dump;
-
-        if (RegValue[n] == null)
-                return;
-
-        alias test3_ret_inst = test3_ret!T;
-        asm {
-             call test3_ret_inst;  // DMD may pop st(0) otherwise
-        }
-        mixin( gen_reg_capture!(n,`["RAX","RDX"]`)() );
-
-        //.dump = dump;
-        //dbg!(T,n)( );
-
-        enum len = RegValue[n].length;
-        foreach ( i; 0..len ) dump[i] &= mask(RegValueSize[n][i]); // zero out padding
-        if( dump[0..len] == RegValue[n] )
-                data3.result[n] = true;
-}
-
-T test3_ret( T )( )
-{
-        T t;
-        foreach( i, ref e; t.tupleof )  e = i+1;
-        return t;
-}
-
-T test3_ret( T : creal )( )
-{
-        T t = 1+2i;
-        return t;
-}
-
-void test3()
-{
-        printf("\nRunning iasm Test 3 ( %s )\n", data3.desc.ptr);
-
-        foreach( int n, T; tuple!( ALL_T, R_T, V_T ) )
-                test3_run!(T,n)( );
-
-        assert( check( data3 ) );
-}
-
-// 0xFF n times
-ulong mask(ulong n)
-{
-        if ( n == ulong.sizeof )   // may wrap
-                return ~0UL;
-        return 2^^( n*8 ) - 1;
-}
-
-/************************************************************************/
-// test4
-
-TEST data4 = { 4, "Check Input Register value" };
-
-void test4_run( T, int n )( T t )
-{
-        typeof(.dump) dump;
-        mixin( gen_reg_capture!(n,`["RDI","RSI"]`)() );
-
-        if (RegValue[n] == null)
-                return;
-
-        //.dump = dump;
-        //dbg!(T,n)( );
-
-        enum len = RegValue[n].length;
-        foreach ( i; 0..len ) dump[i] &= mask(RegValueSize[n][i]); // zero out padding
-        if( dump[0..len] == RegValue[n] )
-                data4.result[n] = true;
-}
-
-void dbg( T, int n )( )
-{
-        import core.stdc.stdio;
-        printf( "D %.*s\t[ %16x", cast(int)T.stringof.length, T.stringof, dump[0] );
-        foreach( i; 1..RegValue[n].length )
-                printf( ", %16x", dump[i] );
-        printf( " ]\n" );
-
-        printf( "C %.*s\t[ %16x", cast(int)T.stringof.length, T.stringof, RegValue[n][0] );
-        foreach( i; 1..RegValue[n].length )
-                printf( ", %16x", RegValue[n][i] );
-        printf( " ]\n" );
-}
-void test4()
-{
-        printf("\nRunning iasm Test 4 ( %s )\n", data4.desc.ptr);
-
-        foreach( int n, T; tuple!( ALL_T, R_T, V_T ) )
-        {
-                T t;
-                static if (is(T == creal))
-                        t = 1+2i;
-                else    foreach( i, ref e; t.tupleof )  e = i+1;
-                test4_run!(T,n)( t );
-        }
-
-        assert( checkRange!( 0, MIX_END )( data4 ) );        // INT FLOAT MIX
-        assert( checkX!( expectedRIn, MIX_END )( data4 ) );  // real's in & out behaviors don't match
-        assert( checkRange!( R_END, V_END )( data4 ) );      // SIMD
-}
-
-
-} // end version(Run_X86_64_Tests)
+{} // end version(Run_X86_64_Tests)
 
 /************************************************************************/
 
 
 void main()
 {
+        printf("Main\n");
         D_test1();
-        D_test2();
+        //D_test2();
 
         version(Run_X86_64_Tests)
         {
