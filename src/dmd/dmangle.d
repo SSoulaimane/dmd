@@ -1092,7 +1092,7 @@ public:
             buf.writeByte('L');
             break;
         default:
-            debug
+            //debug
             {
                 printf("storageClass = x%llx\n", p.storageClass & (STC.in_ | STC.out_ | STC.ref_ | STC.lazy_));
             }
