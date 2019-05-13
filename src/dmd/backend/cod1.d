@@ -3365,7 +3365,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
         for (int i = 0; i < np; i++)
         {
             elem* ep = parameters[i].e;
-            int preg = parameters[i].reg;
+            reg_t preg = parameters[i].reg;
             //printf("parameter[%d] = %d, np = %d\n", i, preg, np);
             if (preg == NOREG)
             {
@@ -3429,7 +3429,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
     for (int i = 0; i < np; i++)
     {
         elem* ep = parameters[i].e;
-        int preg = parameters[i].reg;
+        reg_t preg = parameters[i].reg;
         //printf("parameter[%d] = %d, np = %d\n", i, preg, np);
         if (preg == NOREG)
         {
@@ -3489,7 +3489,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
             regm_t retregs = mask(preg);
             if (retregs & XMMREGS)
                 ++xmmcnt;
-            int preg2 = parameters[i].reg2;
+            reg_t preg2 = parameters[i].reg2;
             reg_t mreg,lreg;
             if (preg2 != NOREG || tybasic(ep.Ety) == TYcfloat)
             {
@@ -3641,7 +3641,7 @@ void cdfunc(ref CodeBuilder cdb, elem* e, regm_t* pretregs)
          */
         for (int i = 0; i < np; i++)
         {
-            int preg = parameters[i].reg;
+            reg_t preg = parameters[i].reg;
             regm_t retregs = mask(preg);
             if (retregs & XMMREGS)
             {
