@@ -11,12 +11,8 @@ jobs:
           command: ./.circleci/run.sh install-deps
           name: Install dependencies
       - run:
-          # needs to be a separate step, s.t. `run.sh` gets updated too
-          command: ./.circleci/run.sh setup-repos
-          name: Merge with upstream + clone DRuntime & Phobos
-      - run:
-          command: ./.circleci/run.sh all
-          name: Run all
+          command: false
+          name: halt
 workflows:
   version: 2
   all:
