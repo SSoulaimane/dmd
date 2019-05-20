@@ -1,0 +1,10 @@
+set disassembly-flavor intel
+set disassemble-next-line on
+run
+p "-----"
+x/i $pc
+p " "
+x/50i $pc-72
+p "-----"
+bt
+info all-registers

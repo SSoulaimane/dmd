@@ -541,7 +541,8 @@ void cod3_stackalign(ref CodeBuilder cdb, int nbytes)
     //printf("cod3_stackalign(%d)\n", nbytes);
     const grex = I64 ? REX_W << 16 : 0;
     const rm = modregrm(3, 4, SP);             // AND ESP,-nbytes
-    cdb.genc2(0x81, grex | rm, -nbytes);
+    const op = nbytes < 128 ? 0x83 : 0x81;
+    cdb.genc2(op, grex | rm, -nbytes);
 }
 
 static if (ELFOBJ)
@@ -4881,7 +4882,7 @@ void assignaddrc(code *c)
                     {
                         // AND ESP, -STACKALIGN
                         code *cn = code_calloc();
-                        cn.Iop = 0x81;
+                        cn.Iop = STACKALIGN < 128 ? 0x83 : 0x81;
                         cn.Irm = modregrm(3, 4, SP);
                         cn.Iflags = CFoff;
                         cn.IFL2 = FLconst;
