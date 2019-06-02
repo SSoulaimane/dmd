@@ -129,8 +129,8 @@ private extern(C++) final class Semantic2Visitor : Visitor
                 error(sa.loc, "static assert:  `%s` is false", sa.exp.toChars());
             if (sc.tinst)
                 sc.tinst.printInstantiationTrace();
-            if (!global.gag)
-                fatal();
+            //if (!global.gag)
+            //    fatal();
         }
     }
 
