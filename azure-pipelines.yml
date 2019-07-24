@@ -1,4 +1,7 @@
 # Learn more: https://aka.ms/yaml
+variables:
+  SYSTEM_PULLREQUEST_TARGETBRANCH: master
+
 jobs:
   - job: Windows
     timeoutInMinutes: 120
@@ -49,3 +52,18 @@ jobs:
           LDC_VERSION: 1.14.0
     steps:
       - template: .azure-pipelines/windows-visual-studio.yml
+  - job: Windows_32_64
+    timeoutInMinutes: 120
+    pool:
+      vmImage: 'vs2017-win2016'
+    variables:
+      VSINSTALLDIR: C:\Program Files (x86)\Microsoft Visual Studio\2017\Enterprise\
+    strategy:
+      matrix:
+        32x64:
+          OS: Win_32
+          MODEL: 64
+          ARCH: x64
+          D_COMPILER: dmd
+    steps:
+      - template: .azure-pipelines/windows-32_64.yml
