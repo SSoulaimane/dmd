@@ -1868,7 +1868,7 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
 
                     if (m > MATCH.nomatch && (fparam.storageClass & (STC.ref_ | STC.auto_ | STC.rvalueref)) == STC.ref_)
                     {
-                        if (!farg.isLvalue())
+                        if (!farg.isLvalue() || farg.isRvalueRef())
                         {
                             if ((farg.op == TOK.string_ || farg.op == TOK.slice) && (prmtype.ty == Tsarray || prmtype.ty == Taarray))
                             {
@@ -1878,14 +1878,14 @@ extern (C++) final class TemplateDeclaration : ScopeDsymbol
                                 goto Lnomatch;
                         }
                     }
-                    if (m > MATCH.nomatch && (fparam.storageClass & STC.rvalueref))
+                    if (m > MATCH.nomatch && ((fparam.storageClass & (STC.rvalueref | STC.auto_)) == STC.rvalueref))
                     {
                         if (farg.isLvalue() && !farg.isRvalueRef())
                             goto Lnomatch;
                     }
                     if (m > MATCH.nomatch && (fparam.storageClass & STC.out_))
                     {
-                        if (!farg.isLvalue())
+                        if (!farg.isLvalue() || farg.isRvalueRef())
                             goto Lnomatch;
                         if (!farg.type.isMutable()) // https://issues.dlang.org/show_bug.cgi?id=11916
                             goto Lnomatch;
@@ -5986,14 +5986,14 @@ extern (C++) class TemplateInstance : ScopeDsymbol
                         Expression farg = fargs && j < fargs.dim ? (*fargs)[j] : fparam.defaultArg;
                         if (!farg)
                             goto Lnotequals;
-                        if (farg.isLvalue())
+                        if (farg.isLvalue() && !farg.isRvalueRef())
                         {
-                            if (!(fparam.storageClass & STC.ref_))
+                            if ((fparam.storageClass & (STC.ref_ | STC.rvalueref)) != STC.ref_)
                                 goto Lnotequals; // auto ref's don't match
                         }
                         else
                         {
-                            if (fparam.storageClass & STC.ref_)
+                            if ((fparam.storageClass & (STC.ref_ | STC.rvalueref)) == STC.ref_)
                                 goto Lnotequals; // auto ref's don't match
                         }
                     }
