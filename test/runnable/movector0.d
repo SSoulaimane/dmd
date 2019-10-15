@@ -71,8 +71,68 @@ void test2()
     assert(a.i == 2);
 }
 
+struct S3
+{
+    static char[] r;
+
+    this(ref inout S3) inout { r ~= "Cc"; }
+    this(@rvalue ref inout S3) inout { r ~= "Mc"; }
+    void opAssign(ref inout S3) inout { r ~= "Ca"; }
+    void opAssign(@rvalue ref inout S3) inout { r ~= "Ma"; }
+    ~this() inout { r ~= "D"; }
+}
+
+S3 get3() { return S3(); }
+void fun3(S3) {}
+
+void test3()
+{
+    S3.r = null;
+    {
+        S3 a = get3();
+        S3 b = a; // Cc
+        S3 c = cast(@rvalue) b; // Mc
+        b = get3(); // MaD
+        b = c; // Ca
+        a = cast(@rvalue) c; // Ma
+        fun3(get3()); // D
+        fun3(cast(@rvalue)b); // McD
+        // DDD
+    }
+    assert(S3.r == "CcMcMaDCaMaDMcDDDD", S3.r);
+}
+
+struct A4
+{
+    static char[] r;
+
+    this(@rvalue ref inout A4) inout { r ~= "Mc"; }
+    this(this) { r ~= "Pb"; }
+    ~this() { r ~= "D"; }
+}
+
+struct S4
+{
+    A4 a;
+}
+
+void test4()
+{
+    A4.r = null;
+    A4 a;
+    a = cast(@rvalue)a;
+    assert(A4.r == "DMc", A4.r);
+
+    A4.r = null;
+    S4 b;
+    b = cast(@rvalue) b;
+    assert(A4.r == "DMc", A4.r);
+}
+
 void main()
 {
     test1();
     test2();
+    test3();
+    test4();
 }
