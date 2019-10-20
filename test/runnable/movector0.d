@@ -1,52 +1,54 @@
 // REQUIRED_ARGS: -preview=rvaluetype
 
-int cpCtor;
-int mvCtor;
-
-struct A
+void test1()
 {
-    this(inout ref A) inout { ++cpCtor; }
-    this(inout @rvalue ref A) inout { ++ mvCtor; }
-}
+    static char[] result;
 
-struct S
-{
-    A a;
-}
+    static struct A
+    {
+        this(inout ref A) inout { result ~= "Cc"; }
+        this(inout @rvalue ref A) inout { result ~= "Mc"; }
+    }
 
-S gs;
-A ga;
+    static struct S
+    {
+        A a;
+    }
 
-T getValue(T)() { return T(); }
-ref T getRef(T)()
-{
-    static if (is(T == S)) return gs;
-    else return ga;
-}
-ref @rvalue(T) getRvalueRef(T)()
-{
-    static if (is(T == S))
-        return cast(@rvalue)gs;
-    else
-        return cast(@rvalue)ga;
-}
+    static S gs;
+    static A ga;
 
-void test(T)()
-{
-    cpCtor = mvCtor = 0;
-    T a;
-    auto b = a; // cop
-    assert(cpCtor == 1 && mvCtor == 0);
-    auto c = cast(@rvalue)a; // move
-    assert(cpCtor == 1 && mvCtor == 1);
+    static T getValue(T)() { return T(); }
+    static ref T getRef(T)()
+    {
+        static if (is(T == S)) return gs;
+        else return ga;
+    }
+    static ref @rvalue(T) getRvalueRef(T)()
+    {
+        static if (is(T == S))
+            return cast(@rvalue)gs;
+        else
+            return cast(@rvalue)ga;
+    }
 
-    cpCtor = mvCtor = 0;
-    auto d = getValue!T(); // nrvo
-    assert(cpCtor == 0 && mvCtor == 0);
-    auto e = getRef!T(); // copy
-    assert(cpCtor == 1 && mvCtor == 0);
-    auto f = getRvalueRef!T(); // move
-    assert(cpCtor == 1 && mvCtor == 1);
+    static void test(T)()
+    {
+        result = null;
+        T a;
+        auto b = a; // Cc
+        auto c = cast(@rvalue)a; // Mc
+        assert(result == "CcMc");
+
+        result = null;
+        auto d = getValue!T(); // nrvo
+        auto f = getRvalueRef!T(); // Mc
+        auto e = getRef!T(); // Cc
+        assert(result == "McCc");
+    }
+
+    test!A();
+    test!S();
 }
 
 struct S2
@@ -71,7 +73,6 @@ void test2()
 
 void main()
 {
-    test!A();
-    test!S();
+    test1();
     test2();
 }
