@@ -260,7 +260,10 @@ private elem *callfunc(const ref Loc loc,
                 /* Copy to a temporary, and make the argument a pointer
                  * to that temporary.
                  */
-                elems[i] = addressElem(ea, arg.type, true);
+                // Non-POD structs are copied to a temporary in the frontend. See: doCopyOrMove().
+                const nonPod = arg.type.isTypeStruct() && !(cast(TypeStruct)arg.type).sym.isPOD();
+                const copy = !nonPod;
+                elems[i] = addressElem(ea, arg.type, copy);
                 continue;
             }
 

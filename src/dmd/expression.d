@@ -431,7 +431,7 @@ private Expression callCpCtor(Scope* sc, Expression e, Type destinationType)
     if (auto ts = e.type.baseElemOf().isTypeStruct())
     {
         StructDeclaration sd = ts.sym;
-        if (sd.postblit || sd.hasCopyCtor)
+        if (!sd.isPOD())
         {
             /* Create a variable tmp, and replace the argument e with:
              *      (tmp = e),tmp
@@ -439,16 +439,8 @@ private Expression callCpCtor(Scope* sc, Expression e, Type destinationType)
              * This is not the most efficient, ideally tmp would be constructed
              * directly onto the stack.
              */
-            auto tmp = copyToTemp(STC.rvalue, "__copytmp", e);
-            if (sd.hasCopyCtor && destinationType)
-                tmp.type = destinationType;
-            tmp.storage_class |= STC.nodtor;
-            tmp.dsymbolSemantic(sc);
-            Expression de = new DeclarationExp(e.loc, tmp);
-            Expression ve = new VarExp(e.loc, tmp);
-            de.type = Type.tvoid;
-            ve.type = e.type;
-            return Expression.combine(de, ve);
+            Type t = sd.hasCopyCtor ? destinationType : e.type;
+            return makeTemp(e.loc, sc, STC.rvalue | STC.nodtor, "__copytmp", e, t);
         }
     }
     return e;
@@ -467,22 +459,47 @@ private Expression callMvCtor(Scope* sc, Expression e, Type destinationType)
     if (auto ts = e.type.baseElemOf().isTypeStruct())
     {
         StructDeclaration sd = ts.sym;
-        if (sd.hasMoveCtor)
+        if (!sd.isPOD())
         {
-            /* (tmp = e),tmp */
-            auto tmp = copyToTemp(STC.rvalue, "__movetmp", e);
-            if (destinationType)
-                tmp.type = destinationType;
-            tmp.storage_class |= STC.nodtor;
-            tmp.dsymbolSemantic(sc);
-            Expression de = new DeclarationExp(e.loc, tmp);
-            Expression ve = new VarExp(e.loc, tmp);
-            de.type = Type.tvoid;
-            ve.type = e.type;
-            return Expression.combine(de, ve);
+            /* Create a variable tmp, and replace the argument e with:
+             *      (tmp = e),tmp
+             * and let AssignExp() handle the construction.
+             * The backend recognized this and doesn't do a second copy for non POD value arguments.
+             */
+            Type t = sd.hasMoveCtor ? destinationType : e.type;
+            return makeTemp(e.loc, sc, STC.rvalue | STC.nodtor, "__movetmp", e, t);
         }
     }
     return valueNoDtor(e);
+}
+
+/**************************************************
+ * Build a temporary variable initialized with `e`.
+ *
+ * Params:
+ *     loc = source location
+ *     sc = scope
+ *     stc = storage classes will be added to the made temporary variable
+ *     name = name for temporary variable
+ *     e = value to initialize the temporary variable
+ *     t = type of the temporary variable.
+ *         if null; the type of the temporary variable will be the type of `e`.
+ *
+ * Returns:
+ *     (tmp = e, tmp)
+ */
+Expression makeTemp(const ref Loc loc, Scope* sc, StorageClass stc, const char* name, Expression e, Type t)
+{
+    /* (tmp = e),tmp */
+    auto tmp = copyToTemp(stc, name, e);
+    if (!t)
+        t = e.type;
+    tmp.type = t;
+    tmp.dsymbolSemantic(sc);
+    Expression de = new DeclarationExp(loc, tmp);
+    Expression ve = new VarExp(loc, tmp);
+    de.type = Type.tvoid;
+    return Expression.combine(de, ve);
 }
 
 /************************************************
