@@ -1135,10 +1135,15 @@ int cvMember(Dsymbol s, ubyte *p)
 }
 else
 {
+    import dmd.aggregate;
     import dmd.denum;
-    import dmd.dstruct;
     import dmd.dclass;
+    import dmd.toctype;
     import dmd.backend.cc;
+    import dmd.backend.dwarf2;
+    import dmd.backend.dwarfdbginf;
+    import dmd.backend.ty;
+    import dmd.backend.type;
 
     /****************************
      * Stub them out.
@@ -1149,12 +1154,137 @@ else
         //printf("EnumDeclaration::toDebug('%s')\n", ed.toChars());
     }
 
-    extern (C++) void toDebug(StructDeclaration sd)
+    extern (C++) void toDebug(AggregateDeclaration ad)
     {
-    }
+        ClassDeclaration cd = ad.isClassDeclaration();
+        type* t = Type_toCtype(ad.type);
+        if (typtr(t.Tty))
+            t = t.Tnext;
+        Classsym *s = t.Ttag;
+        struct_t *st = s.Sstruct;
 
-    extern (C++) void toDebug(ClassDeclaration cd)
-    {
+        __gshared ubyte[8] abbrevTypeClass0 =
+        [
+            DW_TAG_structure_type,
+            0,                      // no children
+            DW_AT_name,             DW_FORM_string,
+            DW_AT_byte_size,        DW_FORM_data1,
+            0,                      0,
+        ];
+        __gshared ubyte[8] abbrevTypeClass1 =
+        [
+            DW_TAG_structure_type,
+            0,                      // no children
+            DW_AT_name,             DW_FORM_string,
+            DW_AT_declaration,      DW_FORM_flag,
+            0,                      0,
+        ];
+        __gshared ubyte[6] abbrevTypeClass2 =
+        [
+            DW_TAG_structure_type,
+            0,                      // no children
+            DW_AT_specification,    DW_FORM_ref4,
+            0,                      0,
+        ];
+
+        if (t.Tflags & (TFsizeunknown | TFforward))
+        {
+            if (s.Stypidx)
+                return; // already declared
+            abbrevTypeClass1[0] = dwarf_classify_struct(st.Sflags);
+            const uint code = dwarf_abbrev_code(abbrevTypeClass1[]);
+            const idx = cast(uint)debug_info.buf.size();
+            debug_info.buf.writeuLEB128(code);
+            debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
+            debug_info.buf.writeByte(1);                  // DW_AT_declaration
+            s.Stypidx = idx; // set Stypidx s.t. the definition would reference it
+            return;
+        }
+
+        const haschildren = (cd && cd.baseclasses.length) || ad.fields.length;
+
+        // process referenced types (base classes and types of members)
+        if (cd) foreach (b; *cd.baseclasses)
+            dwarf_typidx(Type_toCtype(b.sym.type));
+        foreach (v; ad.fields)
+            dwarf_typidx(Type_toCtype(v.type));
+
+        // write class definition
+        if (s.Stypidx)
+        {
+            // this is a definition referencing a previous declaration
+            abbrevTypeClass2[0] = dwarf_classify_struct(st.Sflags);
+            abbrevTypeClass2[1] = haschildren;
+            const uint code = dwarf_abbrev_code(abbrevTypeClass2[]);
+            const idx = cast(uint)debug_info.buf.size();
+            debug_info.buf.writeuLEB128(code);
+            debug_info.buf.write32(s.Stypidx);                  // DW_AT_byte_size
+            s.Stypidx = idx;
+        }
+        else
+        {
+            abbrevTypeClass0[0] = dwarf_classify_struct(st.Sflags);
+            abbrevTypeClass0[1] = haschildren;
+            const uint code = dwarf_abbrev_code(abbrevTypeClass0[]);
+            const idx = cast(uint)debug_info.buf.size();
+            debug_info.buf.writeuLEB128(code);
+            debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
+            debug_info.buf.writeByte(0);                  // DW_AT_byte_size
+            s.Stypidx = idx;
+        }
+
+        if (!haschildren)
+        {
+            reset_symbuf.write(&s, (s).sizeof);
+            return;
+        }
+
+        // write base classes
+        if (cd && cd.baseclasses.length)
+        {
+            __gshared ubyte[10] abbrevInheritance =
+            [
+                DW_TAG_inheritance,
+                0,                      // no children
+                DW_AT_type,             DW_FORM_ref4,
+                DW_AT_data_member_location, DW_FORM_udata,
+                DW_AT_accessibility,    DW_FORM_data1,
+                0,                      0,
+            ];
+            const uint inheritancecode = dwarf_abbrev_code(abbrevInheritance[]);
+            foreach (b; *cd.baseclasses)
+            {
+                debug_info.buf.writeuLEB128(inheritancecode);
+                debug_info.buf.write32(dwarf_typidx(Type_toCtype(b.sym.type).Tnext));
+                debug_info.buf.writeuLEB128(b.offset);
+                debug_info.buf.writeByte(DW_ACCESS_public);
+            }
+        }
+
+        // write fields
+
+        __gshared const ubyte[] abbrevMember =
+        [
+            DW_TAG_member,
+            0,              // no children
+            DW_AT_name,     DW_FORM_string,
+            DW_AT_type,     DW_FORM_ref4,
+            DW_AT_data_member_location, DW_FORM_udata,
+            0,              0
+        ];
+        const uint membercode = dwarf_abbrev_code(abbrevMember[]);
+
+        foreach (v; ad.fields)
+        {
+            debug_info.buf.writeuLEB128(membercode);
+            debug_info.buf.writeString(v.ident.toChars());
+            debug_info.buf.write32(dwarf_typidx(Type_toCtype(v.type)));
+            debug_info.buf.writeuLEB128(v.offset);
+        }
+
+        debug_info.buf.writeByte(0);          // no more children
+
+        reset_symbuf.write(&s, (s).sizeof);
     }
 
     extern (C++) void toDebugClosure(Symbol* closstru)

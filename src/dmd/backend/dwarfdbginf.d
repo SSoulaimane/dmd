@@ -111,7 +111,7 @@ void addSegmentToComdat(segidx_t seg, segidx_t comdatseg);
 
 Symbol* getRtlsymPersonality();
 
-private Outbuffer  *reset_symbuf;        // Keep pointers to reset symbols
+Outbuffer  *reset_symbuf;        // Keep pointers to reset symbols
 }
 
 /***********************************
@@ -518,7 +518,7 @@ static if (MACHOBJ)
     Section debug_ranges   = { name: "__debug_ranges" };
     Section debug_loc      = { name: "__debug_loc" };
     Section debug_abbrev   = { name: "__debug_abbrev" };
-    Section debug_info     = { name: "__debug_info" };
+    public Section debug_info = { name: "__debug_info" };
     Section debug_str      = { name: "__debug_str" };
 // We use S_REGULAR to make sure the linker doesn't remove this section. Needed
 // for filenames and line numbers in backtraces.
@@ -531,7 +531,7 @@ else static if (ELFOBJ)
     Section debug_ranges   = { name: ".debug_ranges" };
     Section debug_loc      = { name: ".debug_loc" };
     Section debug_abbrev   = { name: ".debug_abbrev" };
-    Section debug_info     = { name: ".debug_info" };
+    public Section debug_info = { name: ".debug_info" };
     Section debug_str      = { name: ".debug_str" };
     Section debug_line     = { name: ".debug_line" };
 }
@@ -2566,14 +2566,6 @@ uint dwarf_typidx(type *t)
             if (s.Stypidx)
                 return s.Stypidx;
 
-            __gshared ubyte[8] abbrevTypeStruct0 =
-            [
-                DW_TAG_structure_type,
-                0,                      // no children
-                DW_AT_name,             DW_FORM_string,
-                DW_AT_byte_size,        DW_FORM_data1,
-                0,                      0,
-            ];
             __gshared ubyte[8] abbrevTypeStruct1 =
             [
                 DW_TAG_structure_type,
@@ -2583,124 +2575,14 @@ uint dwarf_typidx(type *t)
                 0,                      0,
             ];
 
-            if (t.Tflags & (TFsizeunknown | TFforward))
-            {
-                abbrevTypeStruct1[0] = dwarf_classify_struct(st.Sflags);
-                code = dwarf_abbrev_code(abbrevTypeStruct1.ptr, (abbrevTypeStruct1).sizeof);
-                idx = cast(uint)debug_info.buf.size();
-                debug_info.buf.writeuLEB128(code);
-                debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
-                debug_info.buf.writeByte(1);                  // DW_AT_declaration
-                break;                  // don't set Stypidx
-            }
-
-            Outbuffer fieldidx;
-
-            // Count number of fields
-            uint nfields = 0;
-            t.Tflags |= TFforward;
-            foreach (sl; ListRange(st.Sfldlst))
-            {
-                Symbol *sf = list_symbol(sl);
-                switch (sf.Sclass)
-                {
-                    case SCmember:
-                        fieldidx.write32(dwarf_typidx(sf.Stype));
-                        nfields++;
-                        break;
-
-                    default:
-                        break;
-                }
-            }
-            t.Tflags &= ~TFforward;
-            if (nfields == 0)
-            {
-                abbrevTypeStruct0[0] = dwarf_classify_struct(st.Sflags);
-                abbrevTypeStruct0[1] = 0;               // no children
-                abbrevTypeStruct0[5] = DW_FORM_data1;   // DW_AT_byte_size
-                code = dwarf_abbrev_code(abbrevTypeStruct0.ptr, (abbrevTypeStruct0).sizeof);
-                idx = cast(uint)debug_info.buf.size();
-                debug_info.buf.writeuLEB128(code);
-                debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
-                debug_info.buf.writeByte(0);                  // DW_AT_byte_size
-            }
-            else
-            {
-                Outbuffer abuf;         // for abbrev
-                abuf.writeByte(dwarf_classify_struct(st.Sflags));
-                abuf.writeByte(1);              // children
-                abuf.writeByte(DW_AT_name);     abuf.writeByte(DW_FORM_string);
-                abuf.writeByte(DW_AT_byte_size);
-
-                size_t sz = cast(uint)st.Sstructsize;
-                if (sz <= 0xFF)
-                    abuf.writeByte(DW_FORM_data1);      // DW_AT_byte_size
-                else if (sz <= 0xFFFF)
-                    abuf.writeByte(DW_FORM_data2);      // DW_AT_byte_size
-                else
-                    abuf.writeByte(DW_FORM_data4);      // DW_AT_byte_size
-                abuf.writeByte(0);              abuf.writeByte(0);
-
-                code = dwarf_abbrev_code(abuf.buf, abuf.size());
-
-                uint membercode;
-                abuf.reset();
-                abuf.writeByte(DW_TAG_member);
-                abuf.writeByte(0);              // no children
-                abuf.writeByte(DW_AT_name);
-                abuf.writeByte(DW_FORM_string);
-                abuf.writeByte(DW_AT_type);
-                abuf.writeByte(DW_FORM_ref4);
-                abuf.writeByte(DW_AT_data_member_location);
-                abuf.writeByte(DW_FORM_block1);
-                abuf.writeByte(0);
-                abuf.writeByte(0);
-                membercode = dwarf_abbrev_code(abuf.buf, abuf.size());
-
-                idx = cast(uint)debug_info.buf.size();
-                debug_info.buf.writeuLEB128(code);
-                debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
-                if (sz <= 0xFF)
-                    debug_info.buf.writeByte(cast(uint)sz);     // DW_AT_byte_size
-                else if (sz <= 0xFFFF)
-                    debug_info.buf.writeWord(cast(uint)sz);     // DW_AT_byte_size
-                else
-                    debug_info.buf.write32(cast(uint)sz);       // DW_AT_byte_size
-
-                s.Stypidx = idx;
-                uint n = 0;
-                foreach (sl; ListRange(st.Sfldlst))
-                {
-                    Symbol *sf = list_symbol(sl);
-                    size_t soffset;
-
-                    switch (sf.Sclass)
-                    {
-                        case SCmember:
-                            debug_info.buf.writeuLEB128(membercode);
-                            debug_info.buf.writeString(sf.Sident.ptr);
-                            //debug_info.buf.write32(dwarf_typidx(sf.Stype));
-                            uint fi = (cast(uint *)fieldidx.buf)[n];
-                            debug_info.buf.write32(fi);
-                            n++;
-                            soffset = debug_info.buf.size();
-                            debug_info.buf.writeByte(2);
-                            debug_info.buf.writeByte(DW_OP_plus_uconst);
-                            debug_info.buf.writeuLEB128(cast(uint)sf.Smemoff);
-                            debug_info.buf.buf[soffset] = cast(ubyte)(debug_info.buf.size() - soffset - 1);
-                            break;
-
-                        default:
-                            break;
-                    }
-                }
-
-                debug_info.buf.writeByte(0);          // no more children
-            }
+            abbrevTypeStruct1[0] = dwarf_classify_struct(st.Sflags);
+            code = dwarf_abbrev_code(abbrevTypeStruct1.ptr, (abbrevTypeStruct1).sizeof);
+            idx = cast(uint)debug_info.buf.size();
+            debug_info.buf.writeuLEB128(code);
+            debug_info.buf.writeString(s.Sident.ptr);        // DW_AT_name
+            debug_info.buf.writeByte(1);                  // DW_AT_declaration
             s.Stypidx = idx;
-            reset_symbuf.write(&s, (s).sizeof);
-            return idx;                 // no need to cache it
+            return idx;
         }
 
         case TYenum:
@@ -2820,6 +2702,11 @@ Lret:
 
 /* ======================= Abbreviation Codes ====================== */
 
+
+extern(D) uint dwarf_abbrev_code(const(ubyte)[] data)
+{
+    return dwarf_abbrev_code(data.ptr, data.length);
+}
 
 uint dwarf_abbrev_code(const(ubyte)* data, size_t nbytes)
 {
